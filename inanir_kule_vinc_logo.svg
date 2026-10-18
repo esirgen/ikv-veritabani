@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 220" width="800" height="220">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1329"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="220" rx="24" fill="url(#bg)"/>
+  <rect x="4" y="4" width="792" height="212" rx="20" fill="none" stroke="url(#gold)" stroke-width="2" stroke-opacity="0.3"/>
+  
+  <!-- Vinç İkonu Sol Bölüm -->
+  <g transform="translate(30, 20) scale(0.35)">
+    <rect width="512" height="512" rx="115" fill="#0f172a" stroke="url(#gold)" stroke-width="6"/>
+    <!-- Kule Vinç -->
+    <polygon points="170,430 290,430 260,390 200,390" fill="url(#gold)"/>
+    <rect x="212" y="160" width="36" height="230" fill="#1e293b" stroke="url(#gold)" stroke-width="4"/>
+    <polygon points="210,160 250,160 230,80" fill="url(#gold)"/>
+    <circle cx="230" cy="80" r="8" fill="#ffffff"/>
+    <line x1="230" y1="155" x2="90" y2="155" stroke="#e2e8f0" stroke-width="8" stroke-linecap="round"/>
+    <line x1="230" y1="80" x2="100" y2="155" stroke="#f59e0b" stroke-width="3"/>
+    <rect x="92" y="145" width="40" height="30" rx="3" fill="#64748b"/>
+    <line x1="230" y1="155" x2="440" y2="155" stroke="url(#gold)" stroke-width="9" stroke-linecap="round"/>
+    <line x1="230" y1="80" x2="320" y2="155" stroke="#f59e0b" stroke-width="3.5"/>
+    <rect x="330" y="156" width="22" height="12" rx="2" fill="#e2e8f0"/>
+    <line x1="341" y1="168" x2="341" y2="245" stroke="#ffffff" stroke-width="2.5"/>
+    <rect x="333" y="245" width="16" height="16" rx="3" fill="url(#gold)"/>
+    <circle cx="341" cy="253" r="3.5" fill="#0f172a"/>
+    <path d="M 341 261 Q 341 278, 332 278 A 7 7 0 0 1 332 267" fill="none" stroke="#e2e8f0" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <!-- Tipografi -->
+  <text x="240" y="95" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="48" fill="#ffffff" letter-spacing="3">İNANIR</text>
+  <text x="425" y="95" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="48" fill="#f59e0b" letter-spacing="3">KULE VİNÇ</text>
+  
+  <rect x="240" y="120" width="510" height="2" fill="url(#gold)" opacity="0.6"/>
+  
+  <text x="240" y="155" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="18" fill="#e2e8f0" letter-spacing="1.5">SAHA TEKNİK SERVİS &amp; ELEKTRONİK TEŞHİS SİSTEMİ</text>
+  <text x="240" y="182" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="500" font-size="14" fill="#94a3b8" letter-spacing="0.8">Potain • Liebherr • Comansa • Zoomlion • Jaso • Sürücü Teşhis</text>
+</svg>
