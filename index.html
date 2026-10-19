@@ -232,6 +232,17 @@
 
           <div class="w-[1px] h-4 bg-slate-800 mx-0.5"></div>
 
+          <button id="btnHeaderCloudSync" class="text-xs text-sky-300 hover:text-white hover:bg-slate-800/90 font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all active:scale-95 relative" title="Ana Ekran, Safari ve Diğer Cihazlar Arası Canlı Bulut Eşitleme">
+            <span id="cloudSyncStatusDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <svg class="w-3.5 h-3.5 text-sky-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+            </svg>
+            <span class="hidden sm:inline">Bulut Eşitle</span>
+            <span class="sm:hidden">Eşitle</span>
+          </button>
+
+          <div class="w-[1px] h-4 bg-slate-800 mx-0.5"></div>
+
           <button id="btnQuickBackup" class="text-xs text-slate-300 hover:text-white hover:bg-slate-800/90 font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all active:scale-95" title="Tüm Arşivi ve Veritabanını Yedekle (JSON)">
             <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -882,10 +893,13 @@
           </h4>
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
             <div>
-              <label class="block text-slate-400 mb-1 font-semibold">Marka *</label>
-              <select id="selectServiceCraneBrand" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-amber-400 font-bold focus:outline-none focus:border-amber-500">
-                <!-- Markalar dinamik doldurulacak -->
-              </select>
+              <label class="block text-slate-400 mb-1 font-semibold">Marka (Seçin veya Elle Yazın) *</label>
+              <div class="space-y-1.5">
+                <select id="selectServiceCraneBrand" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-amber-400 font-bold focus:outline-none focus:border-amber-500">
+                  <!-- Markalar dinamik doldurulacak -->
+                </select>
+                <input type="text" id="inputServiceCraneBrandManual" placeholder="Markayı manuel yazın (örn: Potain,BKT,Arcon)..." class="w-full bg-slate-900 border border-amber-500/40 rounded-xl px-3 py-2 text-amber-400 font-bold placeholder-slate-500 focus:outline-none focus:border-amber-500">
+              </div>
             </div>
             <div>
               <label class="block text-slate-400 mb-1 font-semibold">Model *</label>
@@ -1416,10 +1430,13 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div>
-            <label class="block text-slate-400 mb-1 font-semibold">Marka *</label>
-            <select id="selectNewMachineBrand" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-amber-400 font-bold focus:outline-none focus:border-amber-500">
-              <!-- Markalar dolacak -->
-            </select>
+            <label class="block text-slate-400 mb-1 font-semibold">Marka (Seçin veya Elle Yazın) *</label>
+            <div class="space-y-1.5">
+              <select id="selectNewMachineBrand" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-amber-400 font-bold focus:outline-none focus:border-amber-500">
+                <!-- Markalar dolacak -->
+              </select>
+              <input type="text" id="inputNewMachineBrandManual" placeholder="Markayı manuel yazın..." class="w-full bg-slate-950 border border-amber-500/40 rounded-xl px-3 py-2 text-amber-400 font-bold placeholder-slate-500 focus:outline-none focus:border-amber-500">
+            </div>
           </div>
           <div>
             <label class="block text-slate-400 mb-1 font-semibold">Model *</label>
@@ -1563,6 +1580,118 @@
       <div class="flex gap-2 pt-2 border-t border-slate-800">
         <button id="btnCancelMediaNote" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl font-semibold transition">İptal</button>
         <button id="btnSaveMediaNote" class="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 py-2.5 rounded-xl font-black transition shadow">💾 Notu Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: BULUT SENKRONİZASYON & CİHAZLAR ARASI EŞİTLEME MERKEZİ -->
+  <div id="modalCloudSync" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xl my-auto max-h-[92vh] flex flex-col text-xs">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-xl">
+            ☁️
+          </div>
+          <div>
+            <h3 class="font-black text-white text-sm sm:text-base flex items-center gap-2">
+              Canlı Bulut & Cihazlar Arası Eşitleme
+              <span id="badgeCloudSyncState" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold">Aktif</span>
+            </h3>
+            <p class="text-[11px] text-slate-400">Ana Ekran uygulaması, Safari ve diğer telefon/bilgisayarlar arasında anlık senkronizasyon</p>
+          </div>
+        </div>
+        <button id="btnCloseCloudSyncModal" class="text-slate-400 hover:text-white text-lg font-bold p-1">✕</button>
+      </div>
+
+      <div class="space-y-3.5 overflow-y-auto pr-1 flex-1 no-scrollbar">
+        <!-- Neden Görünmüyor Açıklaması -->
+        <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 space-y-1 text-slate-200 leading-relaxed">
+          <div class="font-bold text-amber-400 flex items-center gap-1.5">
+            <span>💡</span> Neden Ana Ekran ile Safari / Diğer Cihazlar Ayrı Görünüyor?
+          </div>
+          <p class="text-[11px] text-slate-300">
+            iPhone (iOS) güvenlik kuralları gereği, <strong>Ana Ekrana Eklenen uygulama</strong> ile <strong>Safari tarayıcısının</strong> hafızalarını birbirinden tamamen izole eder. Aşağıdaki <strong>Firma Eşitleme Kodu</strong> sayesinde açtığınız servis fişleri, eklediğiniz makineler ve modeller bulut üzerinden tüm cihazlarınızda ve Safari'de otomatik eşitlenir.
+          </p>
+        </div>
+
+        <!-- 1. Otomatik Canlı Bulut Eşitleme Odası -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-3">
+          <div class="flex items-center justify-between">
+            <label for="inputCloudRoomCode" class="font-black text-sky-400 text-xs flex items-center gap-1.5">
+              <span>🔑</span> Ortak Firma / Ekip Eşitleme Kodu:
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 font-semibold">
+              <input type="checkbox" id="chkAutoCloudSync" checked class="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0">
+              <span>Otomatik Eşitle</span>
+            </label>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <input type="text" id="inputCloudRoomCode" placeholder="Örn: INANIR-VINC-2026" class="flex-1 bg-slate-900 border border-sky-500/40 rounded-xl px-3 py-2.5 text-sm text-white font-mono font-black uppercase tracking-wider focus:outline-none focus:border-sky-400">
+            <button id="btnSaveCloudRoomCode" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-black px-3.5 py-2.5 rounded-xl text-xs transition shadow active:scale-95 whitespace-nowrap">
+              Kodu Kaydet
+            </button>
+          </div>
+          <p class="text-[10px] text-slate-400">
+            Ana ekrandaki uygulamada, Safari'de ve diğer telefonlarda <strong>aynı kodu</strong> girin. Kayıt açtığınız anda tüm cihazlara otomatik düşer.
+          </p>
+
+          <!-- Hızlı Senkronizasyon Butonları -->
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button id="btnPullCloudNow" class="bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-500/30 font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95">
+              <span>🔄</span>
+              <span>Buluttaki Kayıtları Çek</span>
+            </button>
+            <button id="btnPushCloudNow" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition shadow active:scale-95">
+              <span>☁️</span>
+              <span>Bu Cihazdakileri Gönder</span>
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-800/80">
+            <span id="txtLastSyncTime">Son eşitleme: Henüz yapılmadı</span>
+            <span id="txtSyncStats" class="text-slate-300 font-semibold"></span>
+          </div>
+        </div>
+
+        <!-- 2. Tek Tıkla AirDrop / WhatsApp / Dosya İle Cihazlar Arası Aktarım (İnternetsiz / Büyük PDF'li Yedek) -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2.5">
+          <h4 class="font-bold text-amber-400 text-xs flex items-center gap-1.5">
+            <span>📲</span> WhatsApp / AirDrop / iCloud Drive ile Tam Paket Aktarımı
+          </h4>
+          <p class="text-[11px] text-slate-400">
+            Yüklediğiniz yüksek boyutlu PDF şemaları ve fotoğraflar dahil tüm veritabanını diğer cihaza veya Safari'ye tek dokunuşla gönderebilirsiniz:
+          </p>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btnShareDatabaseFile" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition shadow active:scale-95">
+              <span>📤</span>
+              <span>Paylaş (AirDrop / WP)</span>
+            </button>
+            <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95 text-center">
+              <input type="file" id="inputCloudImportFile" accept=".json" class="hidden">
+              <span>📥</span>
+              <span>Yedek Dosyası Yükle</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 3. Gelişmiş: Özel Bulut Sunucu / Firebase URL (İsteğe Bağlı) -->
+        <details class="bg-slate-950 border border-slate-800 rounded-xl p-3">
+          <summary class="font-bold text-slate-300 cursor-pointer flex items-center justify-between">
+            <span>⚙️ Gelişmiş: Özel Firebase / REST Veritabanı Bağlantısı (Opsiyonel)</span>
+            <span class="text-[10px] text-slate-500">İsteğe Bağlı</span>
+          </summary>
+          <div class="mt-2.5 space-y-2 pt-2 border-t border-slate-800">
+            <p class="text-[10px] text-slate-400">
+              Kendi özel Firebase Realtime Database adresiniz varsa buraya yapıştırabilirsiniz (boş bırakırsanız varsayılan ücretsiz anlık bulut servisi kullanılır):
+            </p>
+            <input type="url" id="inputCustomFirebaseUrl" placeholder="https://projeniz-default-rtdb.firebaseio.com" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-500">
+          </div>
+        </details>
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-800 shrink-0">
+        <button id="btnCloseCloudSyncBottom" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl transition">Kapat</button>
       </div>
     </div>
   </div>
@@ -23511,11 +23640,379 @@
       applyCompanyInfoToUI();
     }
 
+    // ==========================================
+    // CANLI BULUT SENKRONİZASYON & CİHAZLAR ARASI EŞİTLEME MOTORU
+    // ==========================================
+    let cloudSyncConfig = {
+      roomCode: 'INANIR-VINC-MERKEZ',
+      autoSync: true,
+      customFirebaseUrl: '',
+      lastSyncTimestamp: 0,
+      deviceId: 'dev-' + Math.random().toString(36).substring(2, 9)
+    };
+    let cloudEventSource = null;
+    let isSyncingFromCloud = false;
+    let cloudPushTimer = null;
+
+    function loadCloudSyncConfig() {
+      try {
+        const saved = localStorage.getItem('InanirKuleVinc_CloudConfig_v1');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          cloudSyncConfig = Object.assign(cloudSyncConfig, parsed);
+        }
+      } catch (e) {}
+    }
+
+    function saveCloudSyncConfig() {
+      try {
+        localStorage.setItem('InanirKuleVinc_CloudConfig_v1', JSON.stringify(cloudSyncConfig));
+      } catch (e) {}
+    }
+
+    function getSanitizedRoomTopic() {
+      const clean = (cloudSyncConfig.roomCode || 'INANIR-VINC-MERKEZ')
+        .toUpperCase()
+        .replace(/[^A-Z0-9_-]/g, '')
+        .trim() || 'INANIR-VINC-MERKEZ';
+      return 'ikv_sync_v10_' + clean.toLowerCase();
+    }
+
+    function buildCompactSyncPayload() {
+      // Bulut üzerinden anında senkronize olması için servis fişleri, makineler, firma bilgileri ve eklenen marka/modelleri paketle
+      const defaultBrandIds = new Set(CRANE_DATA.map(b => b.id));
+      const customBrands = [];
+      const customModelsByBrand = {};
+      const customCodesByModel = {};
+
+      (store.brands || []).forEach(b => {
+        if (!defaultBrandIds.has(b.id)) {
+          customBrands.push({
+            id: b.id,
+            name: b.name,
+            country: b.country,
+            models: (b.models || []).map(m => ({
+              id: m.id,
+              name: m.name,
+              maxCapacityTons: m.maxCapacityTons,
+              jibLengthMeters: m.jibLengthMeters,
+              tipLoadTons: m.tipLoadTons,
+              description: m.description,
+              codes: m.codes || []
+            }))
+          });
+        } else {
+          const defBrand = CRANE_DATA.find(db => db.id === b.id);
+          const defModelIds = new Set((defBrand?.models || []).map(dm => dm.id));
+          (b.models || []).forEach(m => {
+            if (!defModelIds.has(m.id)) {
+              if (!customModelsByBrand[b.id]) customModelsByBrand[b.id] = [];
+              customModelsByBrand[b.id].push({
+                id: m.id,
+                name: m.name,
+                maxCapacityTons: m.maxCapacityTons,
+                jibLengthMeters: m.jibLengthMeters,
+                tipLoadTons: m.tipLoadTons,
+                description: m.description,
+                codes: m.codes || []
+              });
+            } else {
+              const defModel = (defBrand?.models || []).find(dm => dm.id === m.id);
+              const defCodeIds = new Set((defModel?.codes || []).map(dc => dc.id));
+              const extraCodes = (m.codes || []).filter(c => !defCodeIds.has(c.id));
+              if (extraCodes.length > 0) {
+                customCodesByModel[m.id] = extraCodes;
+              }
+            }
+          });
+        }
+      });
+
+      return {
+        ts: Date.now(),
+        deviceId: cloudSyncConfig.deviceId,
+        roomCode: cloudSyncConfig.roomCode,
+        companyInfo: store.companyInfo,
+        machines: store.machines || [],
+        serviceForms: (store.serviceForms || []).map(s => {
+          const copy = Object.assign({}, s);
+          delete copy.photos;
+          return copy;
+        }),
+        customBrands,
+        customModelsByBrand,
+        customCodesByModel
+      };
+    }
+
+    function mergeIncomingCloudPayload(payload, showNotification = false) {
+      if (!payload || typeof payload !== 'object') return false;
+      let changed = false;
+
+      // 1. Servis Fişlerini Birleştir (En güncel olanları ve yeni eklenenleri koru)
+      if (Array.isArray(payload.serviceForms)) {
+        const localForms = store.serviceForms || [];
+        const byId = new Map();
+        localForms.forEach(f => byId.set(f.id, f));
+        payload.serviceForms.forEach(remoteForm => {
+          if (!remoteForm || !remoteForm.id) return;
+          if (!byId.has(remoteForm.id)) {
+            localForms.unshift(remoteForm);
+            byId.set(remoteForm.id, remoteForm);
+            changed = true;
+          } else {
+            const existing = byId.get(remoteForm.id);
+            if (JSON.stringify(existing) !== JSON.stringify(remoteForm)) {
+              Object.assign(existing, remoteForm);
+              changed = true;
+            }
+          }
+        });
+        store.serviceForms = localForms;
+      }
+
+      // 2. Makineleri (Seri No Kütüğü) Birleştir
+      if (Array.isArray(payload.machines)) {
+        const localMachines = store.machines || [];
+        const bySerial = new Map();
+        localMachines.forEach(m => bySerial.set((m.serialNo || m.id).toLowerCase(), m));
+        payload.machines.forEach(remoteMac => {
+          if (!remoteMac || !remoteMac.serialNo) return;
+          const key = remoteMac.serialNo.toLowerCase();
+          if (!bySerial.has(key)) {
+            localMachines.unshift(remoteMac);
+            bySerial.set(key, remoteMac);
+            changed = true;
+          } else {
+            const existing = bySerial.get(key);
+            if (JSON.stringify(existing) !== JSON.stringify(remoteMac)) {
+              Object.assign(existing, remoteMac);
+              changed = true;
+            }
+          }
+        });
+        store.machines = localMachines;
+      }
+
+      // 3. Firma Bilgilerini Güncelle
+      if (payload.companyInfo && payload.companyInfo.name) {
+        if (JSON.stringify(store.companyInfo) !== JSON.stringify(payload.companyInfo)) {
+          store.companyInfo = payload.companyInfo;
+          applyCompanyInfoToUI();
+          changed = true;
+        }
+      }
+
+      // 4. Özel Eklenen Markaları ve Modelleri Birleştir
+      if (Array.isArray(payload.customBrands)) {
+        payload.customBrands.forEach(cb => {
+          if (!store.brands.some(b => b.id === cb.id || b.name.toLowerCase() === cb.name.toLowerCase())) {
+            store.brands.push(cb);
+            changed = true;
+          }
+        });
+      }
+
+      if (payload.customModelsByBrand && typeof payload.customModelsByBrand === 'object') {
+        Object.keys(payload.customModelsByBrand).forEach(brandId => {
+          const brand = store.brands.find(b => b.id === brandId);
+          if (brand) {
+            (payload.customModelsByBrand[brandId] || []).forEach(cm => {
+              if (!brand.models.some(m => m.id === cm.id || m.name.toLowerCase() === cm.name.toLowerCase())) {
+                brand.models.push(cm);
+                changed = true;
+              }
+            });
+          }
+        });
+      }
+
+      if (changed) {
+        isSyncingFromCloud = true;
+        try {
+          localStorage.setItem('InanirKuleVinc_Store_v10', JSON.stringify(store));
+        } catch (e) {}
+        isSyncingFromCloud = false;
+
+        // Aktif görünümü yenile
+        renderBrands(document.getElementById('inputBrandSearch')?.value || '');
+        if (!document.getElementById('viewModelList').classList.contains('hidden')) renderModels();
+        if (!document.getElementById('viewModelDetail').classList.contains('hidden')) renderModelDetail();
+        if (!document.getElementById('viewServiceForms').classList.contains('hidden')) renderServiceForms();
+        if (!document.getElementById('viewFleet').classList.contains('hidden')) renderFleetView();
+
+        if (showNotification) {
+          showToast('☁️ Buluttan yeni servis ve makine kayıtları eşitlendi!');
+        }
+      }
+
+      cloudSyncConfig.lastSyncTimestamp = Date.now();
+      saveCloudSyncConfig();
+      updateCloudSyncUIStatus('Bağlı & Eşitlendi');
+      return changed;
+    }
+
+    function updateCloudSyncUIStatus(statusText, isError = false) {
+      const dot = document.getElementById('cloudSyncStatusDot');
+      const badge = document.getElementById('badgeCloudSyncState');
+      const lastTime = document.getElementById('txtLastSyncTime');
+      const stats = document.getElementById('txtSyncStats');
+
+      if (dot) {
+        dot.className = isError
+          ? 'w-2 h-2 rounded-full bg-amber-400'
+          : 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+      }
+      if (badge) {
+        badge.innerText = statusText || 'Aktif';
+        badge.className = isError
+          ? 'text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 font-bold'
+          : 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold';
+      }
+      if (lastTime && cloudSyncConfig.lastSyncTimestamp) {
+        const d = new Date(cloudSyncConfig.lastSyncTimestamp);
+        lastTime.innerText = 'Son eşitleme: ' + d.toLocaleTimeString('tr-TR');
+      }
+      if (stats) {
+        const sCount = (store.serviceForms || []).length;
+        const mCount = (store.machines || []).length;
+        stats.innerText = `${sCount} Servis Fişi • ${mCount} Makine`;
+      }
+    }
+
+    async function pushStoreToCloud(manual = false) {
+      if (!cloudSyncConfig.autoSync && !manual) return;
+      const payload = buildCompactSyncPayload();
+      const topic = getSanitizedRoomTopic();
+
+      try {
+        updateCloudSyncUIStatus('Gönderiliyor...');
+        // 1. Özel Firebase URL varsa oraya da yaz
+        if (cloudSyncConfig.customFirebaseUrl && cloudSyncConfig.customFirebaseUrl.startsWith('http')) {
+          const fbUrl = cloudSyncConfig.customFirebaseUrl.replace(/\/$/, '') + '/' + topic + '.json';
+          await fetch(fbUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        }
+
+        // 2. Anlık Bulut Kanalına (ntfy pub/sub cache) gönder
+        const res = await fetch('https://ntfy.sh/' + topic, {
+          method: 'POST',
+          headers: {
+            'Title': 'IKV_SYNC',
+            'Cache': 'yes'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          cloudSyncConfig.lastSyncTimestamp = Date.now();
+          saveCloudSyncConfig();
+          updateCloudSyncUIStatus('Eşitlendi');
+          if (manual) showToast('☁️ Tüm kayıtlar buluta gönderildi! Diğer cihazlardan görebilirsiniz.');
+        } else {
+          updateCloudSyncUIStatus('Çevrimdışı (Yerel)', true);
+        }
+      } catch (err) {
+        updateCloudSyncUIStatus('Çevrimdışı (Yerel)', true);
+        if (manual) showToast('İnternet bağlantısı kontrol ediliyor, yerel hafızaya kaydedildi.');
+      }
+    }
+
+    async function pullStoreFromCloud(manual = false) {
+      const topic = getSanitizedRoomTopic();
+      try {
+        updateCloudSyncUIStatus('Kontrol ediliyor...');
+
+        // 1. Özel Firebase URL varsa önce oradan çek
+        if (cloudSyncConfig.customFirebaseUrl && cloudSyncConfig.customFirebaseUrl.startsWith('http')) {
+          const fbUrl = cloudSyncConfig.customFirebaseUrl.replace(/\/$/, '') + '/' + topic + '.json';
+          const fbRes = await fetch(fbUrl);
+          if (fbRes.ok) {
+            const fbData = await fbRes.json();
+            if (fbData && fbData.ts) {
+              mergeIncomingCloudPayload(fbData, manual);
+              if (manual) showToast('🔄 Buluttaki tüm kayıtlar bu cihaza aktarıldı!');
+              return;
+            }
+          }
+        }
+
+        // 2. Anlık Bulut Kanalından son durum mesajlarını çek
+        const res = await fetch('https://ntfy.sh/' + topic + '/json?poll=1&since=all');
+        if (res.ok) {
+          const text = await res.text();
+          const lines = text.trim().split('\n').filter(Boolean);
+          let latestPayload = null;
+          for (const line of lines) {
+            try {
+              const msg = JSON.parse(line);
+              if (msg.event === 'message' && msg.message) {
+                const parsed = JSON.parse(msg.message);
+                if (parsed && parsed.ts) {
+                  if (!latestPayload || parsed.ts >= latestPayload.ts) {
+                    latestPayload = parsed;
+                  }
+                }
+              }
+            } catch (e) {}
+          }
+          if (latestPayload) {
+            const updated = mergeIncomingCloudPayload(latestPayload, manual);
+            if (manual && !updated) {
+              showToast('✓ Tüm kayıtlarınız zaten güncel!');
+            }
+          } else {
+            // Kanalda henüz veri yoksa bu cihazdaki veriyi ilk kayıt olarak yükle
+            await pushStoreToCloud(false);
+            if (manual) showToast('☁️ Bulut odası oluşturuldu ve mevcut kayıtlarınız yüklendi!');
+          }
+          updateCloudSyncUIStatus('Eşitlendi');
+        }
+      } catch (err) {
+        updateCloudSyncUIStatus('Çevrimdışı (Yerel)', true);
+        if (manual) showToast('Buluta bağlanılamadı, internet bağlantınızı kontrol edin.');
+      }
+    }
+
+    function startLiveCloudSubscription() {
+      if (cloudEventSource) {
+        try { cloudEventSource.close(); } catch (e) {}
+        cloudEventSource = null;
+      }
+      if (!cloudSyncConfig.autoSync) return;
+
+      const topic = getSanitizedRoomTopic();
+      try {
+        cloudEventSource = new EventSource('https://ntfy.sh/' + topic + '/sse');
+        cloudEventSource.onmessage = function(event) {
+          try {
+            const data = JSON.parse(event.data);
+            if (data && data.message) {
+              const payload = JSON.parse(data.message);
+              if (payload && payload.deviceId !== cloudSyncConfig.deviceId) {
+                mergeIncomingCloudPayload(payload, true);
+              }
+            }
+          } catch (e) {}
+        };
+      } catch (e) {}
+    }
+
     function saveStore() {
       try {
         localStorage.setItem('InanirKuleVinc_Store_v10', JSON.stringify(store));
       } catch (e) {
         console.warn('Depolama hatası:', e);
+      }
+      // Her kayıt/değişiklik sonrası otomatik buluta eşitle (Ana Ekran <-> Safari <-> Diğer Cihazlar)
+      if (!isSyncingFromCloud && cloudSyncConfig.autoSync) {
+        if (cloudPushTimer) clearTimeout(cloudPushTimer);
+        cloudPushTimer = setTimeout(() => {
+          pushStoreToCloud(false);
+        }, 400);
       }
     }
 function showToast(msg) {
@@ -24868,19 +25365,33 @@ function showToast(msg) {
     function populateCraneBrandSelect(selectId, selectedBrandName = '') {
       const select = document.getElementById(selectId);
       if (!select) return;
-      select.innerHTML = '<option value="">Marka Seçiniz...</option>';
+      select.innerHTML = '<option value="">Listeden Marka Seçiniz...</option>';
+      let matchedInList = false;
       store.brands.forEach(b => {
         const opt = document.createElement('option');
         opt.value = b.name;
         opt.innerText = b.name;
-        if (b.name === selectedBrandName) opt.selected = true;
+        if (selectedBrandName && b.name.toLowerCase() === selectedBrandName.toLowerCase()) {
+          opt.selected = true;
+          matchedInList = true;
+        }
         select.appendChild(opt);
       });
       const optOther = document.createElement('option');
       optOther.value = 'Diğer';
-      optOther.innerText = 'Diğer / Özel';
-      if (selectedBrandName === 'Diğer') optOther.selected = true;
+      optOther.innerText = '✏️ Manuel Marka Yaz (Diğer / Özel)';
+      if (selectedBrandName && !matchedInList) {
+        optOther.selected = true;
+      }
       select.appendChild(optOther);
+
+      const manualInputId = selectId === 'selectServiceCraneBrand' ? 'inputServiceCraneBrandManual' : (selectId === 'selectNewMachineBrand' ? 'inputNewMachineBrandManual' : null);
+      if (manualInputId) {
+        const manualInput = document.getElementById(manualInputId);
+        if (manualInput) {
+          manualInput.value = (selectedBrandName && selectedBrandName !== 'Diğer') ? selectedBrandName : '';
+        }
+      }
     }
 
     function openServiceFormModal(existingFormId = null, targetSerial = null) {
@@ -24996,7 +25507,9 @@ function showToast(msg) {
       const clientCompany = document.getElementById('inputClientCompany').value.trim();
       const siteName = document.getElementById('inputSiteName').value.trim();
       const workDone = document.getElementById('inputServiceWorkDone').value.trim();
-      const craneBrand = document.getElementById('selectServiceCraneBrand').value;
+      const manualBrandVal = document.getElementById('inputServiceCraneBrandManual')?.value.trim() || '';
+      const selectBrandVal = document.getElementById('selectServiceCraneBrand').value;
+      const craneBrand = manualBrandVal || (selectBrandVal !== 'Diğer' ? selectBrandVal : '');
       const craneModel = document.getElementById('inputServiceCraneModel').value.trim();
 
       if (!clientCompany || !siteName) {
@@ -25171,7 +25684,7 @@ function showToast(msg) {
                 <span style="font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: #fef3c7; color: #92400e;">MAKİNE</span>
               </div>
               <div style="display: flex; flex-direction: column; gap: 3px;">
-                <div><strong style="color: #475569;">Marka / Model:</strong> <span style="font-weight: 700; color: #b45309;"${editAttr('craneModel')}>${form.craneBrand || ''} ${form.craneModel || ''}</span></div>
+                <div><strong style="color: #475569;">Marka / Model:</strong> <span style="font-weight: 700; color: #b45309;"${editAttr('craneBrand')}>${form.craneBrand || '-'}</span> <span style="font-weight: 700; color: #b45309;"${editAttr('craneModel')}>${form.craneModel || ''}</span></div>
                 <div><strong style="color: #475569;">Seri / Kule No:</strong> <span style="font-family: monospace; font-weight: 700; color: #0f172a;"${editAttr('craneSerial')}>${form.craneSerial || '-'}</span></div>
                 <div><strong style="color: #475569;">Bom / Yükseklik:</strong> <span${editAttr('craneJib')}>${form.craneJib ? form.craneJib + 'm Bom' : '-'}</span> • <span${editAttr('craneHeight')}>${form.craneHeight ? form.craneHeight + 'm Yükseklik' : '-'}</span></div>
               </div>
@@ -25993,8 +26506,26 @@ function showToast(msg) {
 
     
     function initApplication() {
+      loadCloudSyncConfig();
       loadStore();
       renderBrands();
+
+      // Açılışta ve uygulama/sekme görünür olduğunda (Ana Ekrandan Safari'ye geçince) buluttan otomatik çek
+      setTimeout(() => {
+        pullStoreFromCloud(false);
+        startLiveCloudSubscription();
+      }, 300);
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && cloudSyncConfig.autoSync) {
+          pullStoreFromCloud(false);
+        }
+      });
+      window.addEventListener('focus', () => {
+        if (cloudSyncConfig.autoSync) {
+          pullStoreFromCloud(false);
+        }
+      });
 
       // Performans için Debounce (Yazarken donmayı/kasmayı önler)
       function debounce(fn, delay = 120) {
@@ -26347,7 +26878,9 @@ function showToast(msg) {
 
       document.getElementById('btnSaveMachine').addEventListener('click', () => {
         const serialNo = document.getElementById('inputNewMachineSerial').value.trim();
-        const brand = document.getElementById('selectNewMachineBrand').value;
+        const manualMacBrand = document.getElementById('inputNewMachineBrandManual')?.value.trim() || '';
+        const selectMacBrand = document.getElementById('selectNewMachineBrand').value;
+        const brand = manualMacBrand || (selectMacBrand !== 'Diğer' ? selectMacBrand : '');
         const model = document.getElementById('inputNewMachineModel').value.trim();
 
         if (!serialNo || !brand) {
@@ -26445,15 +26978,69 @@ function showToast(msg) {
       // Servis Arama
       document.getElementById('inputServiceSearch')?.addEventListener('input', () => renderServiceForms());
 
-      // Marka seçildiğinde otomatik model tamamlama desteği
+      // Marka seçildiğinde manuel marka kutusunu ve otomatik model tamamlamayı senkronize et
       document.getElementById('selectServiceCraneBrand')?.addEventListener('change', (e) => {
         const brandName = e.target.value;
+        const manualInput = document.getElementById('inputServiceCraneBrandManual');
+        if (brandName === 'Diğer') {
+          if (manualInput) {
+            manualInput.value = '';
+            manualInput.focus();
+          }
+          return;
+        }
+        if (manualInput) {
+          manualInput.value = brandName;
+        }
         const brand = store.brands.find(b => b.name === brandName);
         if (brand && brand.models && brand.models.length > 0) {
           const modelInput = document.getElementById('inputServiceCraneModel');
           if (!modelInput.value) {
             modelInput.value = brand.models[0].name;
           }
+        }
+      });
+
+      document.getElementById('inputServiceCraneBrandManual')?.addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        const select = document.getElementById('selectServiceCraneBrand');
+        if (!select) return;
+        const matchedBrand = store.brands.find(b => b.name.toLowerCase() === val.toLowerCase());
+        if (matchedBrand) {
+          select.value = matchedBrand.name;
+        } else if (val.length > 0) {
+          select.value = 'Diğer';
+        } else {
+          select.value = '';
+        }
+      });
+
+      document.getElementById('selectNewMachineBrand')?.addEventListener('change', (e) => {
+        const brandName = e.target.value;
+        const manualInput = document.getElementById('inputNewMachineBrandManual');
+        if (brandName === 'Diğer') {
+          if (manualInput) {
+            manualInput.value = '';
+            manualInput.focus();
+          }
+          return;
+        }
+        if (manualInput) {
+          manualInput.value = brandName;
+        }
+      });
+
+      document.getElementById('inputNewMachineBrandManual')?.addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        const select = document.getElementById('selectNewMachineBrand');
+        if (!select) return;
+        const matchedBrand = store.brands.find(b => b.name.toLowerCase() === val.toLowerCase());
+        if (matchedBrand) {
+          select.value = matchedBrand.name;
+        } else if (val.length > 0) {
+          select.value = 'Diğer';
+        } else {
+          select.value = '';
         }
       });
 
@@ -26680,6 +27267,88 @@ function showToast(msg) {
         downloadAnchor.remove();
         showToast('Yedek JSON dosyası indirildi');
       }
+
+      // BULUT EŞİTLEME MODALI VE BUTONLARI
+      const modalCloudSync = document.getElementById('modalCloudSync');
+      function openCloudSyncModal() {
+        document.getElementById('inputCloudRoomCode').value = cloudSyncConfig.roomCode || 'INANIR-VINC-MERKEZ';
+        document.getElementById('chkAutoCloudSync').checked = !!cloudSyncConfig.autoSync;
+        document.getElementById('inputCustomFirebaseUrl').value = cloudSyncConfig.customFirebaseUrl || '';
+        updateCloudSyncUIStatus('Aktif');
+        modalCloudSync.classList.remove('hidden');
+      }
+
+      document.getElementById('btnHeaderCloudSync')?.addEventListener('click', openCloudSyncModal);
+      document.getElementById('btnCloseCloudSyncModal')?.addEventListener('click', () => modalCloudSync.classList.add('hidden'));
+      document.getElementById('btnCloseCloudSyncBottom')?.addEventListener('click', () => modalCloudSync.classList.add('hidden'));
+
+      document.getElementById('btnSaveCloudRoomCode')?.addEventListener('click', () => {
+        const code = document.getElementById('inputCloudRoomCode').value.trim().toUpperCase() || 'INANIR-VINC-MERKEZ';
+        cloudSyncConfig.roomCode = code;
+        cloudSyncConfig.autoSync = document.getElementById('chkAutoCloudSync').checked;
+        cloudSyncConfig.customFirebaseUrl = document.getElementById('inputCustomFirebaseUrl').value.trim();
+        saveCloudSyncConfig();
+        startLiveCloudSubscription();
+        pullStoreFromCloud(true);
+        showToast('🔑 Eşitleme kodu kaydedildi ve bulut senkronizasyonu başlatıldı!');
+      });
+
+      document.getElementById('chkAutoCloudSync')?.addEventListener('change', (e) => {
+        cloudSyncConfig.autoSync = e.target.checked;
+        saveCloudSyncConfig();
+        if (cloudSyncConfig.autoSync) {
+          startLiveCloudSubscription();
+          pullStoreFromCloud(false);
+        }
+      });
+
+      document.getElementById('btnPullCloudNow')?.addEventListener('click', () => pullStoreFromCloud(true));
+      document.getElementById('btnPushCloudNow')?.addEventListener('click', () => pushStoreToCloud(true));
+
+      document.getElementById('btnShareDatabaseFile')?.addEventListener('click', async () => {
+        try {
+          const jsonStr = JSON.stringify(store, null, 2);
+          const blob = new Blob([jsonStr], { type: 'application/json' });
+          const fileName = `Inanir_Kule_Vinc_Yedek_${new Date().toISOString().slice(0, 10)}.json`;
+          const file = new File([blob], fileName, { type: 'application/json' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: 'İnanır Kule Vinç Veritabanı Yedeği',
+              text: 'Ana Ekran, Safari ve diğer cihazlar için tam arşiv yedeği.'
+            });
+            showToast('✓ Paylaşım ekranı açıldı!');
+            return;
+          }
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+        }
+        exportData();
+      });
+
+      document.getElementById('inputCloudImportFile')?.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          try {
+            const imported = JSON.parse(event.target.result);
+            if (imported && imported.brands) {
+              store = imported;
+              mergeWithDefaultLibraries();
+              saveStore();
+              renderBrands();
+              if (!document.getElementById('viewServiceForms').classList.contains('hidden')) renderServiceForms();
+              if (!document.getElementById('viewFleet').classList.contains('hidden')) renderFleetView();
+              modalCloudSync.classList.add('hidden');
+              showToast('✓ Tüm yedek başarıyla yüklendi ve bulutla eşitlendi!');
+            }
+          } catch (err) {
+            showToast('Geçersiz yedek dosyası!');
+          }
+        };
+        reader.readAsText(file);
+      });
 
       document.getElementById('btnQuickBackup').addEventListener('click', exportData);
       document.getElementById('btnExportData').addEventListener('click', exportData);
