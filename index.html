@@ -23810,7 +23810,8 @@
           type: med.type || 'pdf',
           date: med.date || '',
           notes: med.notes || '',
-          externalUrl: med.externalUrl || ''
+          externalUrl: med.externalUrl || '',
+          cloudBlobUrl: med.cloudBlobUrl || ''
         };
         if (med.externalUrl) {
           copy.data = med.externalUrl;
@@ -24016,6 +24017,7 @@
             if (rMed.title && existingMed.title !== rMed.title) { existingMed.title = rMed.title; mediaChanged = true; }
             if (rMed.notes && existingMed.notes !== rMed.notes) { existingMed.notes = rMed.notes; mediaChanged = true; }
             if (rMed.externalUrl && existingMed.externalUrl !== rMed.externalUrl) { existingMed.externalUrl = rMed.externalUrl; mediaChanged = true; }
+            if (rMed.cloudBlobUrl && existingMed.cloudBlobUrl !== rMed.cloudBlobUrl) { existingMed.cloudBlobUrl = rMed.cloudBlobUrl; mediaChanged = true; }
             if (rMed.thumbData && !existingMed.thumbData) { existingMed.thumbData = rMed.thumbData; mediaChanged = true; }
           }
         }
@@ -24284,6 +24286,20 @@
         cloudEventSource.onmessage = async function(event) {
           try {
             const data = JSON.parse(event.data);
+            if (data && data.event === 'message' && data.message && data.message.includes('"reqMediaId"')) {
+              const reqObj = JSON.parse(data.message);
+              if (reqObj && reqObj.reqMediaId && reqObj.deviceId !== cloudSyncConfig.deviceId) {
+                const localBlob = await getMediaBlobFromIDB(reqObj.reqMediaId);
+                if (localBlob) {
+                  let foundItem = null;
+                  (store.brands || []).forEach(b => (b.models || []).forEach(m => (m.media || []).forEach(med => {
+                    if (med.id === reqObj.reqMediaId) foundItem = med;
+                  })));
+                  await pushMediaBlobToCloud(reqObj.reqMediaId, localBlob, foundItem);
+                }
+                return;
+              }
+            }
             const payload = await extractPayloadFromNtfyMessage(data);
             if (payload && payload.deviceId !== cloudSyncConfig.deviceId) {
               mergeIncomingCloudPayload(payload, true);
@@ -25175,55 +25191,122 @@ function showToast(msg) {
       });
     }
 
-    async function pushMediaBlobToCloud(mediaId, blobOrFile) {
+    async function pushMediaBlobToCloud(mediaId, blobOrFile, itemRef = null) {
       if (!mediaId || !blobOrFile) return false;
       const mediaTopic = getSanitizedMediaTopic(mediaId);
+      let uploadedAny = false;
       try {
         // 1. Özel Firebase RTDB tanımlıysa oraya da yaz
         if (cloudSyncConfig.customFirebaseUrl && cloudSyncConfig.customFirebaseUrl.startsWith('http')) {
           const dataUrl = await blobToDataUrl(blobOrFile);
           if (dataUrl) {
             const fbUrl = cloudSyncConfig.customFirebaseUrl.replace(/\/$/, '') + '/' + mediaTopic + '.json';
-            await fetch(fbUrl, {
+            const fbRes = await fetch(fbUrl, {
               method: 'PUT',
               body: JSON.stringify({ mediaId, mime: blobOrFile.type || 'application/pdf', dataUrl, ts: Date.now() })
             });
+            if (fbRes.ok) uploadedAny = true;
           }
         }
 
-        // 2. Doğrudan ikili (binary) gövdeyi veya parçalara bölünmüş base64 paketini ntfy bulut kanalına yükle
-        // ntfy.sh PUT/POST ile doğrudan binary dosya (attachment) veya metin destekler
-        const res = await fetch('https://ntfy.sh/' + mediaTopic, {
-          method: 'PUT',
-          body: blobOrFile
-        });
-        if (res.ok) return true;
-
-        // Fallback: Eğer PUT attachment sınırına takılırsa 2800 baytlık sıralı paketler halinde gönder
-        const dataUrl = await blobToDataUrl(blobOrFile);
-        if (dataUrl && dataUrl.length <= 450000) {
-          const chunkSize = 2800;
-          const totalChunks = Math.ceil(dataUrl.length / chunkSize);
-          const transferId = 'tr_' + Date.now();
-          for (let idx = 0; idx < totalChunks; idx++) {
-            const part = dataUrl.slice(idx * chunkSize, (idx + 1) * chunkSize);
-            await fetch('https://ntfy.sh/' + mediaTopic, {
-              method: 'POST',
-              body: JSON.stringify({ t: transferId, i: idx, n: totalChunks, d: part })
-            });
+        // 2. Büyük PDF dosyaları için CORS uyumlu doğrudan bulut dosya sunucusuna (tmpfiles.org API) multipart POST yüklemesi
+        try {
+          const fd = new FormData();
+          const ext = (blobOrFile.type && blobOrFile.type.includes('pdf')) ? '.pdf' : '.bin';
+          fd.append('file', blobOrFile, mediaId + ext);
+          const tfRes = await fetch('https://tmpfiles.org/api/v1/upload', {
+            method: 'POST',
+            body: fd
+          });
+          if (tfRes.ok) {
+            const tfJson = await tfRes.json();
+            const rawUrl = tfJson && tfJson.data && tfJson.data.url ? tfJson.data.url : '';
+            if (rawUrl) {
+              const directDlUrl = rawUrl.replace('http://tmpfiles.org/', 'https://tmpfiles.org/dl/').replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+              if (itemRef) {
+                itemRef.cloudBlobUrl = directDlUrl;
+                saveStore();
+              } else {
+                (store.brands || []).forEach(b => (b.models || []).forEach(m => (m.media || []).forEach(med => {
+                  if (med.id === mediaId) med.cloudBlobUrl = directDlUrl;
+                })));
+                saveStore();
+              }
+              await fetch('https://ntfy.sh/' + mediaTopic, {
+                method: 'POST',
+                body: JSON.stringify({ cloudBlobUrl: directDlUrl, mediaId, ts: Date.now() })
+              });
+              uploadedAny = true;
+            }
           }
-          return true;
+        } catch (tfErr) {}
+
+        // 3. CORS preflight (OPTIONS) hatasına takılmayan doğrudan POST ile ntfy kanalına gönderim
+        try {
+          const plainBlob = new Blob([await blobOrFile.arrayBuffer()], { type: 'text/plain' });
+          const res = await fetch('https://ntfy.sh/' + mediaTopic, {
+            method: 'POST',
+            body: plainBlob
+          });
+          if (res.ok) uploadedAny = true;
+        } catch (postErr) {}
+
+        // 4. Parçalı (chunked) aktarım yedeği (2.5 MB'a kadar PDF'ler için gecikmeli gönderim)
+        if (!uploadedAny) {
+          const dataUrl = await blobToDataUrl(blobOrFile);
+          if (dataUrl && dataUrl.length <= 2600000) {
+            const chunkSize = 3200;
+            const totalChunks = Math.ceil(dataUrl.length / chunkSize);
+            const transferId = 'tr_' + Date.now();
+            for (let idx = 0; idx < totalChunks; idx++) {
+              const part = dataUrl.slice(idx * chunkSize, (idx + 1) * chunkSize);
+              await fetch('https://ntfy.sh/' + mediaTopic, {
+                method: 'POST',
+                body: JSON.stringify({ t: transferId, i: idx, n: totalChunks, d: part })
+              });
+              if (idx % 5 === 4) {
+                await new Promise(r => setTimeout(r, 90));
+              }
+            }
+            uploadedAny = true;
+          }
         }
       } catch (e) {
         console.warn('Bulut medya yükleme uyarısı:', e);
       }
-      return false;
+      return uploadedAny;
     }
 
-    async function pullMediaBlobFromCloud(mediaId, expectedType = 'pdf') {
+    async function requestMediaFromRemoteDevice(mediaId) {
+      if (!mediaId) return;
+      const roomTopic = getSanitizedRoomTopic();
+      try {
+        await fetch('https://ntfy.sh/' + roomTopic, {
+          method: 'POST',
+          body: JSON.stringify({ reqMediaId: mediaId, deviceId: cloudSyncConfig.deviceId, ts: Date.now() })
+        });
+      } catch (e) {}
+    }
+
+    async function pullMediaBlobFromCloud(mediaId, expectedType = 'pdf', itemRef = null) {
       if (!mediaId) return null;
       const mediaTopic = getSanitizedMediaTopic(mediaId);
+      const mime = expectedType === 'pdf' ? 'application/pdf' : 'image/jpeg';
       try {
+        // 0. Eğer öğenin doğrudan bulut indirme adresi (cloudBlobUrl) varsa oradan çek
+        const directUrl = itemRef && itemRef.cloudBlobUrl ? itemRef.cloudBlobUrl : null;
+        if (directUrl && directUrl.startsWith('http')) {
+          try {
+            const dRes = await fetch(directUrl);
+            if (dRes.ok) {
+              const rawB = await dRes.blob();
+              const finalB = new Blob([await rawB.arrayBuffer()], { type: mime });
+              await saveMediaBlobToIDB(mediaId, finalB);
+              return finalB;
+            }
+          } catch (e) {}
+        }
+
         // 1. Özel Firebase RTDB varsa kontrol et
         if (cloudSyncConfig.customFirebaseUrl && cloudSyncConfig.customFirebaseUrl.startsWith('http')) {
           const fbUrl = cloudSyncConfig.customFirebaseUrl.replace(/\/$/, '') + '/' + mediaTopic + '.json';
@@ -25246,7 +25329,6 @@ function showToast(msg) {
         const lines = text.trim().split('\n').filter(Boolean);
         if (lines.length === 0) return null;
 
-        // En son yüklenen attachment (dosya) mesajını ara
         const chunkGroups = {};
         let latestTransferId = null;
 
@@ -25254,11 +25336,23 @@ function showToast(msg) {
           try {
             const msg = JSON.parse(lines[i]);
             if (msg.event !== 'message') continue;
+            // cloudBlobUrl mesajı varsa indir
+            if (msg.message && msg.message.includes('"cloudBlobUrl"')) {
+              const parsedUrlObj = JSON.parse(msg.message);
+              if (parsedUrlObj && parsedUrlObj.cloudBlobUrl) {
+                const cRes = await fetch(parsedUrlObj.cloudBlobUrl);
+                if (cRes.ok) {
+                  const rawBlob = await cRes.blob();
+                  const finalBlob = new Blob([await rawBlob.arrayBuffer()], { type: mime });
+                  await saveMediaBlobToIDB(mediaId, finalBlob);
+                  return finalBlob;
+                }
+              }
+            }
             if (msg.attachment && msg.attachment.url) {
               const attRes = await fetch(msg.attachment.url);
               if (attRes.ok) {
                 const rawBlob = await attRes.blob();
-                const mime = expectedType === 'pdf' ? 'application/pdf' : (rawBlob.type || 'image/jpeg');
                 const finalBlob = new Blob([await rawBlob.arrayBuffer()], { type: mime });
                 await saveMediaBlobToIDB(mediaId, finalBlob);
                 return finalBlob;
@@ -25306,7 +25400,7 @@ function showToast(msg) {
             if (med && med.id && !med.externalUrl && med.id !== 'med-p1') {
               const localBlob = await getMediaBlobFromIDB(med.id);
               if (localBlob) {
-                const ok = await pushMediaBlobToCloud(med.id, localBlob);
+                const ok = await pushMediaBlobToCloud(med.id, localBlob, med);
                 if (ok) pushedCount++;
               }
             }
@@ -25376,7 +25470,7 @@ function showToast(msg) {
       }
       if (!rawData || rawData.startsWith('idb://')) {
         // Bu cihazda yerel olarak yoksa uzaktaki cihazın yüklediği bulut medya kanalından otomatik indir!
-        const cloudBlob = await pullMediaBlobFromCloud(item.id, item.type);
+        const cloudBlob = await pullMediaBlobFromCloud(item.id, item.type, item);
         if (cloudBlob) return cloudBlob;
         // Eğer küçük önizleme (thumbData) varsa görsel için onu döndür
         if (item.thumbData && item.thumbData.startsWith('data:')) {
@@ -25762,15 +25856,103 @@ function showToast(msg) {
 
         await renderActivePdfPage(1, sessionId);
       } catch (err) {
-        console.warn('PDF.js render uyarısı, yerel görünüme geçiliyor:', err);
-        pdfPagesContainer.innerHTML = '';
-        pdfPagesContainer.classList.add('hidden');
-        iframe.classList.remove('hidden');
-        const blob = await resolveMediaBlob(item);
-        if (blob) {
-          activeViewerObjectUrl = URL.createObjectURL(blob);
+        console.warn('PDF.js render uyarısı:', err);
+        const fallbackBlob = await resolveMediaBlob(item);
+        if (fallbackBlob) {
+          pdfPagesContainer.innerHTML = '';
+          pdfPagesContainer.classList.add('hidden');
+          iframe.classList.remove('hidden');
+          activeViewerObjectUrl = URL.createObjectURL(fallbackBlob);
           iframe.src = activeViewerObjectUrl;
+          return;
         }
+        // Dosya gövdesi henüz bu cihaza ulaşmadıysa siyah boş ekran yerine interaktif kurtarma ve eşitleme paneli göster!
+        iframe.classList.add('hidden');
+        pdfPagesContainer.classList.remove('hidden');
+        pdfPagesContainer.innerHTML = `
+          <div class="w-full max-w-lg my-auto mx-auto bg-slate-900 border border-amber-500/40 rounded-2xl p-5 text-center space-y-4 shadow-2xl">
+            <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-3xl">
+              ☁️
+            </div>
+            <div class="space-y-1.5">
+              <h4 class="text-sm sm:text-base font-black text-white">PDF Kaydı Eşitlendi Ancak Dosya Gövdesi Bekleniyor</h4>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                <strong class="text-amber-400">"${item.title || 'PDF Şema'}"</strong> başlığı diğer cihazdan bulut üzerinden bu cihaza ulaştı; fakat yüksek boyutlu PDF dosyasının kendisi diğer cihazın yerel hafızasında (<code class="text-amber-300">IndexedDB</code>) bulunuyor.
+              </p>
+            </div>
+
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-left text-[11px] text-slate-300 space-y-1.5">
+              <div class="font-bold text-amber-400">💡 Bu PDF'i kendi cihazınızda hemen açmak için 3 yöntem:</div>
+              <p><strong>1. Canlı İstek Gönderin:</strong> Diğer cihazda uygulama açıkken aşağıdaki mavi butona basın; diğer cihaz PDF'i otomatik olarak buluta yükleyip burada açacaktır.</p>
+              <p><strong>2. Tam Yedek Paketi Paylaşın:</strong> PDF'i eklediğiniz cihazda <strong>Bulut Eşitle › Paylaş (AirDrop / WP)</strong> veya <strong>Bu Cihazdakileri Gönder</strong> butonuna basın.</p>
+              <p><strong>3. Dosyayı Buradan Seçin veya Drive Linki Ekleyin:</strong> PDF dosyası bu cihazda da varsa aşağıdan doğrudan seçip kalıcı olarak eşleştirebilirsiniz.</p>
+            </div>
+
+            <div class="space-y-2.5 pt-1">
+              <button type="button" id="btnRequestPdfFromOtherDevice" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-black py-3 px-4 rounded-xl text-xs transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                <span>🔄</span>
+                <span>Diğer Cihazdan / Buluttan PDF Dosyasını Şimdi İste</span>
+              </button>
+
+              <label class="w-full cursor-pointer bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3 px-4 rounded-xl text-xs transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                <input type="file" id="inputBindMissingPdfFile" accept="application/pdf" class="hidden">
+                <span>📄</span>
+                <span>PDF Dosyasını Bu Cihazdan Seç & Buluta Eşitle</span>
+              </label>
+
+              <div class="pt-2 border-t border-slate-800 flex items-center gap-2">
+                <input type="url" id="inputBindExternalPdfUrl" placeholder="Veya Google Drive / iCloud PDF linki yapıştırın..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400">
+                <button type="button" id="btnBindExternalPdfUrl" class="bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 font-bold px-3 py-2 rounded-xl text-xs whitespace-nowrap transition active:scale-95">
+                  🔗 Linki Kaydet
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('btnRequestPdfFromOtherDevice')?.addEventListener('click', async (e) => {
+          const btn = e.currentTarget;
+          btn.disabled = true;
+          btn.innerHTML = '<span>⏳</span> <span>Diğer cihazdan talep ediliyor (10 sn)...</span>';
+          await requestMediaFromRemoteDevice(item.id);
+          await pullStoreFromCloud(false);
+          for (let attempt = 1; attempt <= 5; attempt++) {
+            await new Promise(r => setTimeout(r, 2000));
+            const pulled = await pullMediaBlobFromCloud(item.id, item.type, item);
+            if (pulled) {
+              showToast('✓ PDF dosyası buluttan indirildi, açılıyor!');
+              renderFullPdfInViewer(item);
+              return;
+            }
+          }
+          btn.disabled = false;
+          btn.innerHTML = '<span>🔄</span> <span>Tekrar Dene (Diğer Cihazda "Bu Cihazdakileri Gönder"e Basın)</span>';
+          showToast('Diğer cihazda uygulamayı açıp "Bulut Eşitle > Bu Cihazdakileri Gönder" butonuna basın.');
+        });
+
+        document.getElementById('inputBindMissingPdfFile')?.addEventListener('change', async (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const blobCopy = new Blob([await file.arrayBuffer()], { type: 'application/pdf' });
+          await saveMediaBlobToIDB(item.id, blobCopy);
+          showToast('✓ PDF kaydedildi ve buluta yükleniyor...');
+          pushMediaBlobToCloud(item.id, blobCopy, item);
+          renderFullPdfInViewer(item);
+        });
+
+        document.getElementById('btnBindExternalPdfUrl')?.addEventListener('click', () => {
+          const val = document.getElementById('inputBindExternalPdfUrl')?.value.trim() || '';
+          if (!val.startsWith('http')) {
+            showToast('Lütfen geçerli bir https:// linki girin');
+            return;
+          }
+          item.externalUrl = val;
+          item.data = val;
+          saveStore();
+          showToast('✓ Bulut linki kaydedildi!');
+          window.open(val, '_blank', 'noopener');
+          closeViewer();
+        });
       }
     }
 
@@ -25922,7 +26104,7 @@ function showToast(msg) {
           // PDF dosyalarını base64 stringe çevirmeden doğrudan Binary Blob olarak IndexedDB'ye kaydet ve Buluta Gönder
           const blobCopy = new Blob([await file.arrayBuffer()], { type: 'application/pdf' });
           await saveMediaBlobToIDB(mediaId, blobCopy);
-          model.media.unshift({
+          const newPdfItem = {
             id: mediaId,
             title: finalTitle,
             category: category,
@@ -25930,9 +26112,13 @@ function showToast(msg) {
             data: 'idb://' + mediaId,
             date: new Date().toLocaleDateString('tr-TR'),
             notes: finalNote
-          });
+          };
+          model.media.unshift(newPdfItem);
           if (cloudSyncConfig.autoSync) {
-            pushMediaBlobToCloud(mediaId, blobCopy);
+            showToast('☁️ PDF buluta yükleniyor, lütfen birkaç saniye bekleyin...');
+            pushMediaBlobToCloud(mediaId, blobCopy, newPdfItem).then(ok => {
+              if (ok) showToast('☁️ PDF buluta aktarıldı, diğer cihazlardan açılabilir!');
+            });
           }
           loadedCount++;
         } else {
