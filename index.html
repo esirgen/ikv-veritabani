@@ -21,6 +21,13 @@
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <!-- PDF.js (Ana Ekran Uygulamasında Çok Sayfalı Tam PDF Görüntüleme Motoru) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (window.pdfjsLib) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -46,6 +53,12 @@
       padding-bottom: env(safe-area-inset-bottom);
       -webkit-tap-highlight-color: transparent;
       user-select: none;
+    }
+    .ios-modal-safe-top {
+      padding-top: max(env(safe-area-inset-top, 48px), 52px) !important;
+    }
+    .ios-modal-safe-bottom {
+      padding-bottom: max(env(safe-area-inset-bottom, 20px), 20px) !important;
     }
     input, textarea, select {
       user-select: auto;
@@ -1026,7 +1039,7 @@
   </div>
 
   <!-- MODAL: RESMİ SERVİS FİŞİ GÖRÜNTÜLEME & YAZDIRMA (A4 YAZDIRMA ŞABLONU) -->
-  <div id="modalPrintServiceReceipt" class="fixed inset-0 z-50 bg-slate-950/90 hidden flex flex-col items-center justify-start p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-transparent print:static">
+  <div id="modalPrintServiceReceipt" class="fixed inset-0 z-50 bg-slate-950/90 hidden flex flex-col items-center justify-start p-2 sm:p-4 overflow-y-auto ios-modal-safe-top print:p-0 print:bg-transparent print:static">
     
     <!-- Üst Kontrol Çubuğu (Sabit/Sticky & Mobil Uyumlu) -->
     <div class="w-full max-w-4xl bg-slate-900/95 text-white border border-slate-800 rounded-2xl p-2.5 sm:p-3.5 mb-2.5 shadow-2xl flex flex-wrap items-center justify-between gap-2 sticky top-1 z-30 print:hidden shrink-0">
@@ -1494,67 +1507,105 @@
   </div>
 
   <!-- MODAL: SERVİS & TAMİR FOTOĞRAFI BÜYÜTÜCÜ -->
-  <div id="modalPhotoPreview" class="fixed inset-0 z-50 bg-black/95 hidden flex flex-col justify-between p-3 sm:p-4">
-    <div class="flex items-center justify-between text-xs text-white pb-2 border-b border-slate-800">
-      <div class="flex items-center gap-2">
-        <span class="text-lg">📷</span>
-        <div>
-          <h4 id="txtPhotoPreviewTitle" class="font-bold text-white text-sm">Servis Fotoğrafı</h4>
-          <span id="txtPhotoPreviewDate" class="text-[10px] text-slate-400">18.10.2026</span>
+  <div id="modalPhotoPreview" class="fixed inset-0 z-[100] bg-black/95 hidden flex flex-col justify-between px-3 sm:px-4 ios-modal-safe-top ios-modal-safe-bottom">
+    <div class="flex items-center justify-between text-xs text-white pb-2.5 border-b border-slate-800 gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="text-lg shrink-0">📷</span>
+        <div class="min-w-0">
+          <h4 id="txtPhotoPreviewTitle" class="font-bold text-white text-sm truncate">Servis Fotoğrafı</h4>
+          <span id="txtPhotoPreviewDate" class="text-[10px] text-slate-400 block truncate">18.10.2026</span>
         </div>
       </div>
-      <button id="btnClosePhotoPreview" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs">
-        ✕ Kapat
-      </button>
-    </div>
-
-    <div class="flex-1 flex items-center justify-center p-2 overflow-hidden">
-      <img id="imgFullPhotoPreview" src="" alt="Tamir Fotoğrafı" class="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl">
-    </div>
-
-    <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
-      <p id="txtPhotoPreviewCaption" class="text-slate-300 text-xs">Açıklama</p>
-      <a id="btnDownloadPhotoPreview" href="#" download class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs">
-        İndir
-      </a>
-    </div>
-  </div>
-<!-- MODAL: TAM EKRAN GÖRSEL / PDF GÖRÜNTÜLEYİCİ -->
-  <div id="modalViewer" class="fixed inset-0 z-50 bg-black/95 hidden flex flex-col">
-    <div class="p-3 bg-slate-900/95 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
-      <div class="flex items-center space-x-2 min-w-0">
-        <button id="btnCloseViewer" class="bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold px-3 py-1.5 rounded-lg shrink-0">
+      <div class="flex items-center gap-2 shrink-0">
+        <button id="btnDownloadPhotoPreviewTop" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-3 py-2 rounded-xl text-xs shadow active:scale-95 transition">
+          📥 İndir
+        </button>
+        <button id="btnClosePhotoPreview" class="bg-red-600 hover:bg-red-500 text-white font-black px-3.5 py-2 rounded-xl text-xs shadow active:scale-95 transition">
           ✕ Kapat
         </button>
-        <span id="txtViewerTitle" class="font-bold text-white truncate max-w-[160px] sm:max-w-md">Şema Görüntüleyici</span>
-      </div>
-      <div class="flex items-center space-x-1.5 shrink-0">
-        <button id="btnZoomOut" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-2.5 py-1.5 rounded-lg active:scale-95 transition">🔍 -</button>
-        <button id="btnZoomReset" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold px-3 py-1.5 rounded-lg active:scale-95 transition">Sıfırla</button>
-        <span id="txtZoomBadge" class="text-[11px] font-mono text-slate-300 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700">%100</span>
-        <button id="btnZoomIn" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-2.5 py-1.5 rounded-lg active:scale-95 transition">🔍 +</button>
-        <button id="btnViewerEditNote" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 font-bold px-2.5 py-1.5 rounded-lg active:scale-95 transition">✏️ Not</button>
-        <a id="btnDownloadCurrentMedia" href="#" download class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-2.5 py-1.5 rounded-lg">İndir</a>
       </div>
     </div>
 
-    <div class="flex-1 relative overflow-auto flex items-center justify-center p-3" id="viewerContainer">
-      <img id="viewerImage" src="" alt="Vinç Şeması" class="max-w-full max-h-[75vh] w-auto h-auto object-contain transition-transform duration-150 origin-center cursor-grab select-none hidden">
+    <div class="flex-1 flex items-center justify-center p-2 overflow-auto">
+      <img id="imgFullPhotoPreview" src="" alt="Tamir Fotoğrafı" class="max-w-full max-h-[74vh] object-contain rounded-xl shadow-2xl">
+    </div>
+
+    <div class="pt-2.5 border-t border-slate-800 flex items-center justify-between gap-2 text-xs">
+      <p id="txtPhotoPreviewCaption" class="text-slate-300 text-xs truncate flex-1">Açıklama</p>
+      <div class="flex items-center gap-2 shrink-0">
+        <a id="btnDownloadPhotoPreview" href="#" download class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-3.5 py-2 rounded-xl text-xs shadow active:scale-95 transition">
+          📥 Fotoğrafı İndir
+        </a>
+        <button id="btnClosePhotoPreviewBottom" class="bg-red-600 hover:bg-red-500 text-white font-black px-3.5 py-2 rounded-xl text-xs shadow active:scale-95 transition">
+          ✕ Kapat
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TAM EKRAN GÖRSEL / PDF GÖRÜNTÜLEYİCİ (ANA EKRAN & SAFARİ TAM UYUMLU) -->
+  <div id="modalViewer" class="fixed inset-0 z-[100] bg-slate-950/98 hidden flex flex-col">
+    <!-- Üst Kontrol Barı (iOS Çentik / Dynamic Island Altında Güvenli Boşluklu) -->
+    <div class="px-3 pb-2.5 bg-slate-900 border-b border-slate-800 flex flex-col gap-2 text-xs shadow-lg shrink-0 ios-modal-safe-top">
+      <div class="flex items-center justify-between gap-2">
+        <button id="btnCloseViewer" class="bg-red-600 hover:bg-red-500 text-white font-black px-3.5 py-2 rounded-xl shrink-0 flex items-center gap-1.5 shadow-md active:scale-95 transition text-xs">
+          <span>✕</span>
+          <span>Kapat</span>
+        </button>
+        <div class="min-w-0 flex-1 text-center px-1">
+          <span id="txtViewerTitle" class="font-bold text-white truncate block text-xs sm:text-sm">Şema Görüntüleyici</span>
+          <span id="txtPdfPageCountBadge" class="hidden text-[10px] text-amber-400 font-extrabold">Tüm Sayfalar Açık</span>
+        </div>
+        <a id="btnDownloadCurrentMedia" href="#" download class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-3.5 py-2 rounded-xl shrink-0 flex items-center gap-1 shadow-md active:scale-95 transition text-xs">
+          <span>📥</span>
+          <span>İndir</span>
+        </a>
+      </div>
+
+      <!-- Yakınlaştırma & Not Araç Çubuğu -->
+      <div class="flex items-center justify-between gap-1.5 pt-1 border-t border-slate-800/80">
+        <div class="flex items-center gap-1.5">
+          <button id="btnZoomOut" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 rounded-lg active:scale-95 transition border border-slate-700">🔍 -</button>
+          <button id="btnZoomReset" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold px-3 py-1.5 rounded-lg active:scale-95 transition">Sıfırla</button>
+          <span id="txtZoomBadge" class="text-[11px] font-mono text-slate-200 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700">%100</span>
+          <button id="btnZoomIn" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 rounded-lg active:scale-95 transition border border-slate-700">🔍 +</button>
+        </div>
+        <button id="btnViewerEditNote" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 font-bold px-3 py-1.5 rounded-lg active:scale-95 transition">
+          ✏️ Notu Düzenle
+        </button>
+      </div>
+    </div>
+
+    <!-- Orta İçerik Alanı: Görsel veya Çok Sayfalı PDF Konteyneri -->
+    <div class="flex-1 relative overflow-y-auto overflow-x-auto flex flex-col items-center justify-start p-2 sm:p-4 bg-slate-950" id="viewerContainer" style="-webkit-overflow-scrolling: touch;">
+      <img id="viewerImage" src="" alt="Vinç Şeması" class="max-w-full max-h-[72vh] w-auto h-auto object-contain transition-transform duration-150 origin-top cursor-grab select-none hidden my-auto rounded-lg shadow-2xl">
+      <!-- Çok Sayfalı PDF Canvas Konteyneri (Tüm Sayfaları Alt Alta Kaydırarak Açar) -->
+      <div id="viewerPdfPagesContainer" class="w-full max-w-4xl flex flex-col items-center gap-4 pb-8 hidden"></div>
       <iframe id="viewerPdfFrame" src="" class="w-full h-full border-0 rounded-lg hidden"></iframe>
     </div>
 
-    <!-- Alt Fotoğraf / Şema Notu Gösterim ve Düzenleme Barı -->
-    <div class="px-4 py-2.5 bg-slate-900/95 border-t border-slate-800 flex items-center justify-between gap-3 text-xs">
+    <!-- Alt Fotoğraf / Şema Notu + Hızlı İndir & Kapat Barı -->
+    <div class="px-3.5 pt-2.5 bg-slate-900 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs shrink-0 ios-modal-safe-bottom">
       <div class="flex items-start gap-2 min-w-0 flex-1">
         <span class="text-amber-400 shrink-0 mt-0.5">📝</span>
         <div class="min-w-0 flex-1">
           <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Fotoğraf / Saha Notu:</span>
-          <p id="txtViewerNote" class="text-slate-200 text-xs break-words">Not bulunmuyor.</p>
+          <p id="txtViewerNote" class="text-slate-200 text-xs break-words line-clamp-2">Not bulunmuyor.</p>
         </div>
       </div>
-      <button id="btnViewerEditNoteBottom" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs shrink-0 transition shadow active:scale-95">
-        ✏️ Notu Düzenle
-      </button>
+      <div class="flex items-center justify-end gap-2 shrink-0">
+        <button id="btnViewerEditNoteBottom" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 font-bold px-3 py-2 rounded-xl text-xs shrink-0 transition active:scale-95">
+          ✏️ Not
+        </button>
+        <button id="btnDownloadCurrentMediaBottom" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-3.5 py-2 rounded-xl text-xs shrink-0 transition shadow active:scale-95 flex items-center gap-1">
+          <span>📥</span>
+          <span>İndir / Kaydet</span>
+        </button>
+        <button id="btnCloseViewerBottom" class="bg-red-600 hover:bg-red-500 text-white font-black px-4 py-2 rounded-xl text-xs shrink-0 transition shadow active:scale-95 flex items-center gap-1">
+          <span>✕</span>
+          <span>Kapat</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -24379,11 +24430,12 @@ function showToast(msg) {
                 <span class="text-amber-400 font-bold">📝 Not:</span> ${item.notes || 'Henüz not eklenmemiş.'}
               </div>
             </div>
-            <div class="flex items-center justify-between pt-1.5 border-t border-slate-800/80 text-[10px] text-slate-500">
-              <span>${item.date}</span>
-              <div class="flex items-center gap-1.5">
-                <button class="btnEditMediaNote bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 font-bold px-2 py-1 rounded-lg border border-slate-700 transition">✏️ Not</button>
-                <button class="btnDeleteMedia bg-slate-800 hover:bg-red-600 hover:text-white text-red-400 font-bold px-2 py-1 rounded-lg border border-slate-700 transition">🗑️</button>
+            <div class="flex items-center justify-between pt-1.5 border-t border-slate-800/80 text-[10px] text-slate-500 gap-1">
+              <span class="truncate">${item.date}</span>
+              <div class="flex items-center gap-1 shrink-0">
+                <button class="btnDownloadMediaCard bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-2 py-1 rounded-lg transition shadow" title="Cihaza İndir / Kaydet">📥 İndir</button>
+                <button class="btnEditMediaNote bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 font-bold px-2 py-1 rounded-lg border border-slate-700 transition" title="Notu Düzenle">✏️</button>
+                <button class="btnDeleteMedia bg-slate-800 hover:bg-red-600 hover:text-white text-red-400 font-bold px-2 py-1 rounded-lg border border-slate-700 transition" title="Sil">🗑️</button>
               </div>
             </div>
           </div>
@@ -24391,6 +24443,11 @@ function showToast(msg) {
 
         card.querySelector('.cursor-pointer').addEventListener('click', () => {
           openViewer(item);
+        });
+
+        card.querySelector('.btnDownloadMediaCard').addEventListener('click', (e) => {
+          e.stopPropagation();
+          downloadOrShareMediaItem(item);
         });
 
         card.querySelector('.btnEditMediaNote').addEventListener('click', (e) => {
@@ -24843,28 +24900,139 @@ function showToast(msg) {
       showToast('Belge başarıyla silindi');
     }
 
-    // GÖRÜNTÜLEYİCİ & ZOOM SIFIRLAMA + NOT DÜZENLEME
+    // GÖRÜNTÜLEYİCİ, ÇOK SAYFALI PDF MOTORU & ANA EKRAN UYGULAMASI İNDİRME SİSTEMİ
     let currentZoom = 1;
     let currentViewingMediaId = null;
+    let currentViewingMediaItem = null;
     let editingMediaNoteId = null;
+
+    function dataUrlToBlob(dataUrl, fallbackMime = 'application/octet-stream') {
+      try {
+        if (dataUrl.startsWith('data:')) {
+          const parts = dataUrl.split(',');
+          const meta = parts[0];
+          const base64Data = parts.slice(1).join(',');
+          const mimeMatch = meta.match(/data:([^;]+)/);
+          const mime = mimeMatch ? mimeMatch[1] : fallbackMime;
+          const isBase64 = meta.includes(';base64');
+          if (isBase64) {
+            const byteString = atob(base64Data);
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let i = 0; i < byteString.length; i++) {
+              ia[i] = byteString.charCodeAt(i);
+            }
+            return new Blob([ab], { type: mime });
+          } else {
+            const decoded = decodeURIComponent(base64Data);
+            return new Blob([decoded], { type: mime });
+          }
+        }
+      } catch (e) {
+        console.warn('Blob dönüştürme hatası:', e);
+      }
+      return null;
+    }
+
+    async function downloadOrShareMediaItem(item) {
+      if (!item || !item.data) return;
+      const isPdf = item.type === 'pdf';
+      let ext = isPdf ? '.pdf' : '.jpg';
+      if (!isPdf && item.data.startsWith('data:image/svg')) ext = '.svg';
+      else if (!isPdf && item.data.startsWith('data:image/png')) ext = '.png';
+
+      const cleanTitle = (item.title || 'Inanir_Vinc_Belge').replace(/[^a-zA-Z0-9ğüşöçıİĞÜŞÖÇ_-]/g, '_');
+      const fileName = cleanTitle.endsWith(ext) ? cleanTitle : (cleanTitle + ext);
+      const fallbackMime = isPdf ? 'application/pdf' : 'image/jpeg';
+
+      // Eğer SVG ise ve kullanıcı fotoğraf olarak kaydetmek istiyorsa yüksek çözünürlüklü PNG'ye çevir
+      let blob = dataUrlToBlob(item.data, fallbackMime);
+      let finalFileName = fileName;
+
+      if (!isPdf && item.data.startsWith('data:image/svg')) {
+        try {
+          blob = await new Promise((resolve) => {
+            const tempImg = new Image();
+            tempImg.onload = () => {
+              const c = document.createElement('canvas');
+              c.width = tempImg.naturalWidth || 1200;
+              c.height = tempImg.naturalHeight || 800;
+              const ctx = c.getContext('2d');
+              ctx.fillStyle = '#0f172a';
+              ctx.fillRect(0, 0, c.width, c.height);
+              ctx.drawImage(tempImg, 0, 0, c.width, c.height);
+              c.toBlob((b) => resolve(b), 'image/png', 0.95);
+            };
+            tempImg.onerror = () => resolve(dataUrlToBlob(item.data, 'image/svg+xml'));
+            tempImg.src = item.data;
+          });
+          finalFileName = cleanTitle.replace(/\.svg$/i, '') + '.png';
+        } catch (e) {}
+      }
+
+      if (!blob) {
+        showToast('Dosya hazırlanamadı');
+        return;
+      }
+
+      // iOS Ana Ekran Uygulaması (Standalone PWA) için Web Share API ile "Dosyalara Kaydet / Fotoğrafı Kaydet" menüsünü aç
+      const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+      try {
+        const fileObj = new File([blob], finalFileName, { type: blob.type });
+        if (isStandalone && navigator.canShare && navigator.canShare({ files: [fileObj] })) {
+          await navigator.share({
+            files: [fileObj],
+            title: item.title || finalFileName
+          });
+          showToast('✓ Kaydetme / Paylaşım menüsü açıldı');
+          return;
+        }
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+      }
+
+      // Standart Tarayıcı ve Fallback Blob İndirme
+      try {
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = finalFileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        }, 2000);
+        showToast(`✓ "${finalFileName}" indiriliyor...`);
+      } catch (err) {
+        showToast('İndirme hatası: ' + err.message);
+      }
+    }
 
     function applyViewerZoom(zoomLevel) {
       currentZoom = Math.round(zoomLevel * 100) / 100;
       const img = document.getElementById('viewerImage');
+      const pdfPagesContainer = document.getElementById('viewerPdfPagesContainer');
       const container = document.getElementById('viewerContainer');
       const zoomBadge = document.getElementById('txtZoomBadge');
 
-      if (img) {
+      if (img && !img.classList.contains('hidden')) {
         if (currentZoom === 1) {
           img.style.transform = 'scale(1)';
           img.style.maxWidth = '100%';
-          img.style.maxHeight = '75vh';
+          img.style.maxHeight = '72vh';
           img.style.width = 'auto';
           img.style.height = 'auto';
         } else {
           img.style.transform = `scale(${currentZoom})`;
         }
       }
+
+      if (pdfPagesContainer && !pdfPagesContainer.classList.contains('hidden')) {
+        pdfPagesContainer.style.width = `${Math.round(currentZoom * 100)}%`;
+        pdfPagesContainer.style.maxWidth = currentZoom > 1 ? 'none' : '56rem';
+      }
+
       if (zoomBadge) {
         zoomBadge.innerText = `%${Math.round(currentZoom * 100)}`;
       }
@@ -24874,40 +25042,139 @@ function showToast(msg) {
       }
     }
 
+    async function renderFullPdfInViewer(dataUrl) {
+      const pdfPagesContainer = document.getElementById('viewerPdfPagesContainer');
+      const iframe = document.getElementById('viewerPdfFrame');
+      const pageCountBadge = document.getElementById('txtPdfPageCountBadge');
+
+      pdfPagesContainer.innerHTML = `
+        <div class="py-12 text-center space-y-3">
+          <div class="inline-block w-8 h-8 border-3 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+          <p class="text-xs font-bold text-amber-400">PDF tüm sayfalarıyla hazırlanıyor, lütfen bekleyin...</p>
+        </div>
+      `;
+      pdfPagesContainer.classList.remove('hidden');
+      iframe.classList.add('hidden');
+
+      try {
+        if (!window.pdfjsLib) {
+          throw new Error('PDF.js kütüphanesi yüklenemedi');
+        }
+        const blob = dataUrlToBlob(dataUrl, 'application/pdf');
+        if (!blob) throw new Error('PDF verisi okunamadı');
+        const arrayBuffer = await blob.arrayBuffer();
+
+        const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdfDoc = await loadingTask.promise;
+        const numPages = pdfDoc.numPages;
+
+        if (pageCountBadge) {
+          pageCountBadge.innerText = `📄 Toplam ${numPages} Sayfa (Aşağı Kaydırarak Tümünü Okuyun)`;
+          pageCountBadge.classList.remove('hidden');
+        }
+
+        pdfPagesContainer.innerHTML = '';
+
+        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+          const pageWrapper = document.createElement('div');
+          pageWrapper.className = 'w-full bg-slate-900 border border-slate-800 rounded-xl p-2 sm:p-3 shadow-xl flex flex-col items-center gap-2';
+
+          const pageHeader = document.createElement('div');
+          pageHeader.className = 'w-full flex items-center justify-between text-[11px] font-bold text-slate-300 px-2 py-1 bg-slate-950 rounded-lg border border-slate-800';
+          pageHeader.innerHTML = `
+            <span class="text-amber-400">📄 Sayfa ${pageNum} / ${numPages}</span>
+            <span class="text-[10px] text-slate-400">İnanır Kule Vinç Şema Arşivi</span>
+          `;
+
+          const canvas = document.createElement('canvas');
+          canvas.className = 'w-full h-auto rounded-lg bg-white shadow';
+
+          pageWrapper.appendChild(pageHeader);
+          pageWrapper.appendChild(canvas);
+          pdfPagesContainer.appendChild(pageWrapper);
+
+          const page = await pdfDoc.getPage(pageNum);
+          // Yüksek netlik için ölçekleme (Retina ekran uyumlu)
+          const viewport = page.getViewport({ scale: 2.0 });
+          const context = canvas.getContext('2d');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+
+          await page.render({
+            canvasContext: context,
+            viewport: viewport
+          }).promise;
+        }
+      } catch (err) {
+        console.warn('PDF.js render hatası, alternatif görünüme geçiliyor:', err);
+        pdfPagesContainer.innerHTML = '';
+        pdfPagesContainer.classList.add('hidden');
+        iframe.classList.remove('hidden');
+        const blob = dataUrlToBlob(dataUrl, 'application/pdf');
+        if (blob) {
+          iframe.src = URL.createObjectURL(blob);
+        } else {
+          iframe.src = dataUrl;
+        }
+      }
+    }
+
     function openViewer(item) {
       const modal = document.getElementById('modalViewer');
       const img = document.getElementById('viewerImage');
       const iframe = document.getElementById('viewerPdfFrame');
+      const pdfPagesContainer = document.getElementById('viewerPdfPagesContainer');
+      const pageCountBadge = document.getElementById('txtPdfPageCountBadge');
       const title = document.getElementById('txtViewerTitle');
       const noteText = document.getElementById('txtViewerNote');
       const downloadBtn = document.getElementById('btnDownloadCurrentMedia');
 
       currentViewingMediaId = item.id;
+      currentViewingMediaItem = item;
       title.innerText = item.title;
       if (noteText) {
-        noteText.innerText = item.notes || 'Not eklenmemiş. Sağdaki "Notu Düzenle" butonuna dokunarak not ekleyebilirsiniz.';
+        noteText.innerText = item.notes || 'Not eklenmemiş. "Not" butonuna dokunarak not ekleyebilirsiniz.';
       }
-      downloadBtn.href = item.data;
-      downloadBtn.download = item.title + (item.type === 'pdf' ? '.pdf' : '.jpg');
 
-      if (item.type === 'pdf') {
-        img.classList.add('hidden');
-        iframe.classList.remove('hidden');
-        iframe.src = item.data;
-      } else {
-        iframe.classList.add('hidden');
-        img.classList.remove('hidden');
-        img.src = item.data;
+      if (downloadBtn) {
+        downloadBtn.href = item.data;
+        downloadBtn.download = item.title + (item.type === 'pdf' ? '.pdf' : '.jpg');
+        downloadBtn.onclick = (e) => {
+          e.preventDefault();
+          downloadOrShareMediaItem(item);
+        };
       }
 
       modal.classList.remove('hidden');
       applyViewerZoom(1);
+
+      if (item.type === 'pdf') {
+        img.classList.add('hidden');
+        renderFullPdfInViewer(item.data);
+      } else {
+        if (pageCountBadge) pageCountBadge.classList.add('hidden');
+        if (pdfPagesContainer) {
+          pdfPagesContainer.innerHTML = '';
+          pdfPagesContainer.classList.add('hidden');
+        }
+        iframe.classList.add('hidden');
+        img.classList.remove('hidden');
+        img.src = item.data;
+      }
     }
 
     function closeViewer() {
       document.getElementById('modalViewer').classList.add('hidden');
       document.getElementById('viewerPdfFrame').src = '';
       document.getElementById('viewerImage').src = '';
+      const pdfPagesContainer = document.getElementById('viewerPdfPagesContainer');
+      if (pdfPagesContainer) {
+        pdfPagesContainer.innerHTML = '';
+        pdfPagesContainer.classList.add('hidden');
+      }
+      const pageCountBadge = document.getElementById('txtPdfPageCountBadge');
+      if (pageCountBadge) pageCountBadge.classList.add('hidden');
+      currentViewingMediaItem = null;
       applyViewerZoom(1);
     }
 
@@ -25265,9 +25532,24 @@ function showToast(msg) {
       document.getElementById('txtPhotoPreviewDate').innerText = `${photo.date || serviceItem.date} • ${serviceItem.craneSerial || ''} (${serviceItem.craneBrand} ${serviceItem.craneModel})`;
       document.getElementById('txtPhotoPreviewCaption').innerText = `Şantiye: ${serviceItem.siteName || ''} • Teknisyen: ${serviceItem.technician || ''}`;
       
+      const mediaObj = {
+        title: photo.title || `Inanir_Vinc_${serviceItem.craneSerial || 'Foto'}`,
+        type: 'image',
+        data: photo.data
+      };
+
       const dl = document.getElementById('btnDownloadPhotoPreview');
-      dl.href = photo.data;
-      dl.download = `Inanir_Vinc_${serviceItem.craneSerial || 'Foto'}_${Date.now()}.jpg`;
+      if (dl) {
+        dl.href = photo.data;
+        dl.onclick = (e) => {
+          e.preventDefault();
+          downloadOrShareMediaItem(mediaObj);
+        };
+      }
+      const dlTop = document.getElementById('btnDownloadPhotoPreviewTop');
+      if (dlTop) {
+        dlTop.onclick = () => downloadOrShareMediaItem(mediaObj);
+      }
 
       modal.classList.remove('hidden');
     }
@@ -27342,8 +27624,13 @@ function showToast(msg) {
         }
       });
 
-      // GÖRÜNTÜLEYİCİ KONTROLLERİ
+      // GÖRÜNTÜLEYİCİ KONTROLLERİ (ÜST VE ALT KAPATMA / İNDİRME BUTONLARI)
       document.getElementById('btnCloseViewer').addEventListener('click', closeViewer);
+      document.getElementById('btnCloseViewerBottom')?.addEventListener('click', closeViewer);
+      document.getElementById('btnClosePhotoPreviewBottom')?.addEventListener('click', closePhotoPreview);
+      document.getElementById('btnDownloadCurrentMediaBottom')?.addEventListener('click', () => {
+        if (currentViewingMediaItem) downloadOrShareMediaItem(currentViewingMediaItem);
+      });
       document.getElementById('btnZoomIn').addEventListener('click', () => {
         applyViewerZoom(Math.min(currentZoom + 0.25, 4.0));
       });
