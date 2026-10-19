@@ -24130,6 +24130,7 @@
         if (showNotification) {
           showToast('☁️ Buluttan yeni kayıtlar senkronize edildi!');
         }
+        autoPrefetchRemoteMediaBlobs();
       }
 
       cloudSyncConfig.lastSyncTimestamp = Date.now();
@@ -25209,10 +25210,10 @@ function showToast(msg) {
           }
         }
 
-        // 2. Büyük PDF dosyaları için CORS uyumlu doğrudan bulut dosya sunucusuna (tmpfiles.org API) multipart POST yüklemesi
+        // 2. Doğrudan bulut dosya sunucusuna (tmpfiles.org API) multipart POST yüklemesi
         try {
           const fd = new FormData();
-          const ext = (blobOrFile.type && blobOrFile.type.includes('pdf')) ? '.pdf' : '.bin';
+          const ext = (blobOrFile.type && blobOrFile.type.includes('pdf')) ? '.pdf' : '.jpg';
           fd.append('file', blobOrFile, mediaId + ext);
           const tfRes = await fetch('https://tmpfiles.org/api/v1/upload', {
             method: 'POST',
@@ -25225,12 +25226,10 @@ function showToast(msg) {
               const directDlUrl = rawUrl.replace('http://tmpfiles.org/', 'https://tmpfiles.org/dl/').replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
               if (itemRef) {
                 itemRef.cloudBlobUrl = directDlUrl;
-                saveStore();
               } else {
                 (store.brands || []).forEach(b => (b.models || []).forEach(m => (m.media || []).forEach(med => {
                   if (med.id === mediaId) med.cloudBlobUrl = directDlUrl;
                 })));
-                saveStore();
               }
               await fetch('https://ntfy.sh/' + mediaTopic, {
                 method: 'POST',
@@ -25241,7 +25240,7 @@ function showToast(msg) {
           }
         } catch (tfErr) {}
 
-        // 3. CORS preflight (OPTIONS) hatasına takılmayan doğrudan POST ile ntfy kanalına gönderim
+        // 3. CORS-Simple POST ile ntfy medya kanalına doğrudan ikili/dataUrl gönderim (4KB üstünü otomatik attachment yapar)
         try {
           const plainBlob = new Blob([await blobOrFile.arrayBuffer()], { type: 'text/plain' });
           const res = await fetch('https://ntfy.sh/' + mediaTopic, {
@@ -25251,25 +25250,8 @@ function showToast(msg) {
           if (res.ok) uploadedAny = true;
         } catch (postErr) {}
 
-        // 4. Parçalı (chunked) aktarım yedeği (2.5 MB'a kadar PDF'ler için gecikmeli gönderim)
-        if (!uploadedAny) {
-          const dataUrl = await blobToDataUrl(blobOrFile);
-          if (dataUrl && dataUrl.length <= 2600000) {
-            const chunkSize = 3200;
-            const totalChunks = Math.ceil(dataUrl.length / chunkSize);
-            const transferId = 'tr_' + Date.now();
-            for (let idx = 0; idx < totalChunks; idx++) {
-              const part = dataUrl.slice(idx * chunkSize, (idx + 1) * chunkSize);
-              await fetch('https://ntfy.sh/' + mediaTopic, {
-                method: 'POST',
-                body: JSON.stringify({ t: transferId, i: idx, n: totalChunks, d: part })
-              });
-              if (idx % 5 === 4) {
-                await new Promise(r => setTimeout(r, 90));
-              }
-            }
-            uploadedAny = true;
-          }
+        if (uploadedAny) {
+          try { localStorage.setItem('ikv_cloud_pushed_' + mediaId, '1'); } catch (e) {}
         }
       } catch (e) {
         console.warn('Bulut medya yükleme uyarısı:', e);
@@ -25293,16 +25275,23 @@ function showToast(msg) {
       const mediaTopic = getSanitizedMediaTopic(mediaId);
       const mime = expectedType === 'pdf' ? 'application/pdf' : 'image/jpeg';
       try {
-        // 0. Eğer öğenin doğrudan bulut indirme adresi (cloudBlobUrl) varsa oradan çek
-        const directUrl = itemRef && itemRef.cloudBlobUrl ? itemRef.cloudBlobUrl : null;
+        // 0. Öğenin üzerinde veya store içinde cloudBlobUrl varsa doğrudan çek
+        let directUrl = itemRef && itemRef.cloudBlobUrl ? itemRef.cloudBlobUrl : null;
+        if (!directUrl) {
+          (store.brands || []).forEach(b => (b.models || []).forEach(m => (m.media || []).forEach(med => {
+            if (med.id === mediaId && med.cloudBlobUrl) directUrl = med.cloudBlobUrl;
+          })));
+        }
         if (directUrl && directUrl.startsWith('http')) {
           try {
             const dRes = await fetch(directUrl);
             if (dRes.ok) {
               const rawB = await dRes.blob();
-              const finalB = new Blob([await rawB.arrayBuffer()], { type: mime });
-              await saveMediaBlobToIDB(mediaId, finalB);
-              return finalB;
+              if (rawB.size > 100) {
+                const finalB = new Blob([await rawB.arrayBuffer()], { type: mime });
+                await saveMediaBlobToIDB(mediaId, finalB);
+                return finalB;
+              }
             }
           } catch (e) {}
         }
@@ -25336,27 +25325,46 @@ function showToast(msg) {
           try {
             const msg = JSON.parse(lines[i]);
             if (msg.event !== 'message') continue;
-            // cloudBlobUrl mesajı varsa indir
             if (msg.message && msg.message.includes('"cloudBlobUrl"')) {
               const parsedUrlObj = JSON.parse(msg.message);
               if (parsedUrlObj && parsedUrlObj.cloudBlobUrl) {
                 const cRes = await fetch(parsedUrlObj.cloudBlobUrl);
                 if (cRes.ok) {
                   const rawBlob = await cRes.blob();
-                  const finalBlob = new Blob([await rawBlob.arrayBuffer()], { type: mime });
-                  await saveMediaBlobToIDB(mediaId, finalBlob);
-                  return finalBlob;
+                  if (rawBlob.size > 100) {
+                    const finalBlob = new Blob([await rawBlob.arrayBuffer()], { type: mime });
+                    await saveMediaBlobToIDB(mediaId, finalBlob);
+                    return finalBlob;
+                  }
                 }
               }
             }
             if (msg.attachment && msg.attachment.url) {
               const attRes = await fetch(msg.attachment.url);
               if (attRes.ok) {
-                const rawBlob = await attRes.blob();
-                const finalBlob = new Blob([await rawBlob.arrayBuffer()], { type: mime });
-                await saveMediaBlobToIDB(mediaId, finalBlob);
-                return finalBlob;
+                const buf = await attRes.arrayBuffer();
+                if (buf.byteLength > 100) {
+                  const firstBytes = new Uint8Array(buf, 0, Math.min(16, buf.byteLength));
+                  const headerStr = String.fromCharCode(...firstBytes);
+                  if (headerStr.startsWith('data:')) {
+                    const fullText = new TextDecoder().decode(buf);
+                    const r = await fetch(fullText);
+                    const finalBlob = await r.blob();
+                    await saveMediaBlobToIDB(mediaId, finalBlob);
+                    return finalBlob;
+                  } else {
+                    const finalBlob = new Blob([buf], { type: mime });
+                    await saveMediaBlobToIDB(mediaId, finalBlob);
+                    return finalBlob;
+                  }
+                }
               }
+            }
+            if (msg.message && msg.message.startsWith('data:')) {
+              const r = await fetch(msg.message);
+              const finalBlob = await r.blob();
+              await saveMediaBlobToIDB(mediaId, finalBlob);
+              return finalBlob;
             }
             if (msg.message && msg.message.startsWith('{')) {
               const parsed = JSON.parse(msg.message);
@@ -25392,22 +25400,54 @@ function showToast(msg) {
       return null;
     }
 
-    async function pushAllLocalMediaBlobsToCloud() {
+    async function pushAllLocalMediaBlobsToCloud(onlyUnpushed = false) {
       let pushedCount = 0;
+      let anyUrlUpdated = false;
       for (const b of (store.brands || [])) {
         for (const m of (b.models || [])) {
           for (const med of (m.media || [])) {
             if (med && med.id && !med.externalUrl && med.id !== 'med-p1') {
+              if (onlyUnpushed && med.cloudBlobUrl && localStorage.getItem('ikv_cloud_pushed_' + med.id) === '1') {
+                continue;
+              }
               const localBlob = await getMediaBlobFromIDB(med.id);
               if (localBlob) {
+                const prevUrl = med.cloudBlobUrl;
                 const ok = await pushMediaBlobToCloud(med.id, localBlob, med);
-                if (ok) pushedCount++;
+                if (ok) {
+                  pushedCount++;
+                  if (med.cloudBlobUrl !== prevUrl) anyUrlUpdated = true;
+                }
               }
             }
           }
         }
       }
+      if (anyUrlUpdated) {
+        saveStore();
+      }
       return pushedCount;
+    }
+
+    async function autoPrefetchRemoteMediaBlobs() {
+      for (const b of (store.brands || [])) {
+        for (const m of (b.models || [])) {
+          for (const med of (m.media || [])) {
+            if (med && med.id && !med.externalUrl && med.id !== 'med-p1') {
+              const existing = await getMediaBlobFromIDB(med.id);
+              if (!existing) {
+                pullMediaBlobFromCloud(med.id, med.type, med).then(pulled => {
+                  if (!pulled) {
+                    requestMediaFromRemoteDevice(med.id);
+                  } else if (!document.getElementById('viewModelDetail').classList.contains('hidden')) {
+                    renderModelDetail();
+                  }
+                });
+              }
+            }
+          }
+        }
+      }
     }
 
     // SİLME İŞLEMİ
@@ -25866,93 +25906,32 @@ function showToast(msg) {
           iframe.src = activeViewerObjectUrl;
           return;
         }
-        // Dosya gövdesi henüz bu cihaza ulaşmadıysa siyah boş ekran yerine interaktif kurtarma ve eşitleme paneli göster!
+        // Dosya gövdesi henüz inmemişse hiçbir manuel buton göstermeden arka planda otomatik olarak buluttan/diğer cihazdan çek ve ekrana çiz!
         iframe.classList.add('hidden');
         pdfPagesContainer.classList.remove('hidden');
         pdfPagesContainer.innerHTML = `
-          <div class="w-full max-w-lg my-auto mx-auto bg-slate-900 border border-amber-500/40 rounded-2xl p-5 text-center space-y-4 shadow-2xl">
-            <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-3xl">
-              ☁️
-            </div>
-            <div class="space-y-1.5">
-              <h4 class="text-sm sm:text-base font-black text-white">PDF Kaydı Eşitlendi Ancak Dosya Gövdesi Bekleniyor</h4>
-              <p class="text-xs text-slate-300 leading-relaxed">
-                <strong class="text-amber-400">"${item.title || 'PDF Şema'}"</strong> başlığı diğer cihazdan bulut üzerinden bu cihaza ulaştı; fakat yüksek boyutlu PDF dosyasının kendisi diğer cihazın yerel hafızasında (<code class="text-amber-300">IndexedDB</code>) bulunuyor.
-              </p>
-            </div>
-
-            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-left text-[11px] text-slate-300 space-y-1.5">
-              <div class="font-bold text-amber-400">💡 Bu PDF'i kendi cihazınızda hemen açmak için 3 yöntem:</div>
-              <p><strong>1. Canlı İstek Gönderin:</strong> Diğer cihazda uygulama açıkken aşağıdaki mavi butona basın; diğer cihaz PDF'i otomatik olarak buluta yükleyip burada açacaktır.</p>
-              <p><strong>2. Tam Yedek Paketi Paylaşın:</strong> PDF'i eklediğiniz cihazda <strong>Bulut Eşitle › Paylaş (AirDrop / WP)</strong> veya <strong>Bu Cihazdakileri Gönder</strong> butonuna basın.</p>
-              <p><strong>3. Dosyayı Buradan Seçin veya Drive Linki Ekleyin:</strong> PDF dosyası bu cihazda da varsa aşağıdan doğrudan seçip kalıcı olarak eşleştirebilirsiniz.</p>
-            </div>
-
-            <div class="space-y-2.5 pt-1">
-              <button type="button" id="btnRequestPdfFromOtherDevice" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-black py-3 px-4 rounded-xl text-xs transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
-                <span>🔄</span>
-                <span>Diğer Cihazdan / Buluttan PDF Dosyasını Şimdi İste</span>
-              </button>
-
-              <label class="w-full cursor-pointer bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3 px-4 rounded-xl text-xs transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
-                <input type="file" id="inputBindMissingPdfFile" accept="application/pdf" class="hidden">
-                <span>📄</span>
-                <span>PDF Dosyasını Bu Cihazdan Seç & Buluta Eşitle</span>
-              </label>
-
-              <div class="pt-2 border-t border-slate-800 flex items-center gap-2">
-                <input type="url" id="inputBindExternalPdfUrl" placeholder="Veya Google Drive / iCloud PDF linki yapıştırın..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400">
-                <button type="button" id="btnBindExternalPdfUrl" class="bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-500/30 font-bold px-3 py-2 rounded-xl text-xs whitespace-nowrap transition active:scale-95">
-                  🔗 Linki Kaydet
-                </button>
-              </div>
-            </div>
+          <div class="py-16 text-center space-y-3 my-auto">
+            <div class="inline-block w-9 h-9 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+            <p class="text-xs sm:text-sm font-bold text-amber-400">☁️ "${item.title || 'PDF Şema'}" buluttan otomatik eşitleniyor...</p>
+            <p class="text-[11px] text-slate-400">Lütfen birkaç saniye bekleyin, tamamlandığında otomatik açılacaktır.</p>
           </div>
         `;
-
-        document.getElementById('btnRequestPdfFromOtherDevice')?.addEventListener('click', async (e) => {
-          const btn = e.currentTarget;
-          btn.disabled = true;
-          btn.innerHTML = '<span>⏳</span> <span>Diğer cihazdan talep ediliyor (10 sn)...</span>';
-          await requestMediaFromRemoteDevice(item.id);
+        await requestMediaFromRemoteDevice(item.id);
+        await pullStoreFromCloud(false);
+        for (let attempt = 1; attempt <= 20; attempt++) {
+          if (sessionId !== activePdfRenderSessionId) return;
+          await new Promise(r => setTimeout(r, 1500));
+          if (sessionId !== activePdfRenderSessionId) return;
           await pullStoreFromCloud(false);
-          for (let attempt = 1; attempt <= 5; attempt++) {
-            await new Promise(r => setTimeout(r, 2000));
-            const pulled = await pullMediaBlobFromCloud(item.id, item.type, item);
-            if (pulled) {
-              showToast('✓ PDF dosyası buluttan indirildi, açılıyor!');
-              renderFullPdfInViewer(item);
-              return;
-            }
-          }
-          btn.disabled = false;
-          btn.innerHTML = '<span>🔄</span> <span>Tekrar Dene (Diğer Cihazda "Bu Cihazdakileri Gönder"e Basın)</span>';
-          showToast('Diğer cihazda uygulamayı açıp "Bulut Eşitle > Bu Cihazdakileri Gönder" butonuna basın.');
-        });
-
-        document.getElementById('inputBindMissingPdfFile')?.addEventListener('change', async (e) => {
-          const file = e.target.files && e.target.files[0];
-          if (!file) return;
-          const blobCopy = new Blob([await file.arrayBuffer()], { type: 'application/pdf' });
-          await saveMediaBlobToIDB(item.id, blobCopy);
-          showToast('✓ PDF kaydedildi ve buluta yükleniyor...');
-          pushMediaBlobToCloud(item.id, blobCopy, item);
-          renderFullPdfInViewer(item);
-        });
-
-        document.getElementById('btnBindExternalPdfUrl')?.addEventListener('click', () => {
-          const val = document.getElementById('inputBindExternalPdfUrl')?.value.trim() || '';
-          if (!val.startsWith('http')) {
-            showToast('Lütfen geçerli bir https:// linki girin');
+          const pulled = await pullMediaBlobFromCloud(item.id, item.type, item);
+          if (pulled) {
+            renderFullPdfInViewer(item);
             return;
           }
-          item.externalUrl = val;
-          item.data = val;
-          saveStore();
-          showToast('✓ Bulut linki kaydedildi!');
-          window.open(val, '_blank', 'noopener');
-          closeViewer();
-        });
+          if (attempt % 3 === 0) {
+            await requestMediaFromRemoteDevice(item.id);
+          }
+        }
       }
     }
 
@@ -26101,7 +26080,7 @@ function showToast(msg) {
         const finalNote = customNote || `${type === 'pdf' ? 'Elektronik devre şeması (PDF)' : 'Denge & saha fotoğrafı'} yüklendi.`;
 
         if (type === 'pdf') {
-          // PDF dosyalarını base64 stringe çevirmeden doğrudan Binary Blob olarak IndexedDB'ye kaydet ve Buluta Gönder
+          // PDF dosyalarını doğrudan Binary Blob olarak IndexedDB'ye kaydet ve otomatik olarak buluta yükle (cloudBlobUrl hazır olsun)
           const blobCopy = new Blob([await file.arrayBuffer()], { type: 'application/pdf' });
           await saveMediaBlobToIDB(mediaId, blobCopy);
           const newPdfItem = {
@@ -26114,15 +26093,14 @@ function showToast(msg) {
             notes: finalNote
           };
           model.media.unshift(newPdfItem);
+          renderModelDetail();
           if (cloudSyncConfig.autoSync) {
-            showToast('☁️ PDF buluta yükleniyor, lütfen birkaç saniye bekleyin...');
-            pushMediaBlobToCloud(mediaId, blobCopy, newPdfItem).then(ok => {
-              if (ok) showToast('☁️ PDF buluta aktarıldı, diğer cihazlardan açılabilir!');
-            });
+            showToast('☁️ PDF diğer cihazlarla otomatik eşitleniyor...');
+            await pushMediaBlobToCloud(mediaId, blobCopy, newPdfItem);
           }
           loadedCount++;
         } else {
-          // Görseller için hem ikili IDB'ye kaydet hem de uzaktaki cihazlarda anında önizleme için hafifletilmiş thumbData üret
+          // Görseller için hem ikili IDB'ye kaydet hem de diğer cihazlarda anında net görünmesi için optimize JPEG ve cloudBlobUrl üret
           const dataUrl = await new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = (e) => resolve(e.target.result);
@@ -26132,20 +26110,20 @@ function showToast(msg) {
           const thumbDataUrl = await new Promise((resolve) => {
             const tempImg = new Image();
             tempImg.onload = () => {
-              const maxW = 480;
-              const scale = Math.min(1, maxW / (tempImg.naturalWidth || 480));
+              const maxW = 1100;
+              const scale = Math.min(1, maxW / (tempImg.naturalWidth || 1100));
               const c = document.createElement('canvas');
-              c.width = Math.max(1, Math.floor((tempImg.naturalWidth || 480) * scale));
-              c.height = Math.max(1, Math.floor((tempImg.naturalHeight || 360) * scale));
+              c.width = Math.max(1, Math.floor((tempImg.naturalWidth || 1100) * scale));
+              c.height = Math.max(1, Math.floor((tempImg.naturalHeight || 800) * scale));
               const ctx = c.getContext('2d');
               ctx.drawImage(tempImg, 0, 0, c.width, c.height);
-              resolve(c.toDataURL('image/jpeg', 0.65));
+              resolve(c.toDataURL('image/jpeg', 0.75));
             };
             tempImg.onerror = () => resolve('');
             tempImg.src = dataUrl;
           });
           await saveMediaBlobToIDB(mediaId, file);
-          model.media.unshift({
+          const newImgItem = {
             id: mediaId,
             title: finalTitle,
             category: category,
@@ -26154,9 +26132,11 @@ function showToast(msg) {
             thumbData: thumbDataUrl,
             date: new Date().toLocaleDateString('tr-TR'),
             notes: finalNote
-          });
+          };
+          model.media.unshift(newImgItem);
+          renderModelDetail();
           if (cloudSyncConfig.autoSync) {
-            pushMediaBlobToCloud(mediaId, file);
+            await pushMediaBlobToCloud(mediaId, file, newImgItem);
           }
           loadedCount++;
         }
@@ -27811,9 +27791,11 @@ function showToast(msg) {
       });
 
       // Açılışta ve uygulama/sekme görünür olduğunda (Ana Ekrandan Safari'ye geçince) buluttan otomatik çek
-      setTimeout(() => {
-        pullStoreFromCloud(false);
+      setTimeout(async () => {
+        await pullStoreFromCloud(false);
         startLiveCloudSubscription();
+        await pushAllLocalMediaBlobsToCloud(true);
+        await autoPrefetchRemoteMediaBlobs();
       }, 300);
 
       document.addEventListener('visibilitychange', () => {
