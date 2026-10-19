@@ -23641,13 +23641,14 @@
     }
 
     // ==========================================
-    // CANLI BULUT SENKRONİZASYON & CİHAZLAR ARASI EŞİTLEME MOTORU
+    // CANLI BULUT SENKRONİZASYON & CİHAZLAR ARASI EŞİTLEME MOTORU (GÜNCELLENMİŞ & KESİN ÇÖZÜM)
     // ==========================================
     let cloudSyncConfig = {
       roomCode: 'INANIR-VINC-MERKEZ',
       autoSync: true,
       customFirebaseUrl: '',
       lastSyncTimestamp: 0,
+      deletedIds: [],
       deviceId: 'dev-' + Math.random().toString(36).substring(2, 9)
     };
     let cloudEventSource = null;
@@ -23660,6 +23661,7 @@
         if (saved) {
           const parsed = JSON.parse(saved);
           cloudSyncConfig = Object.assign(cloudSyncConfig, parsed);
+          if (!Array.isArray(cloudSyncConfig.deletedIds)) cloudSyncConfig.deletedIds = [];
         }
       } catch (e) {}
     }
@@ -23675,11 +23677,46 @@
         .toUpperCase()
         .replace(/[^A-Z0-9_-]/g, '')
         .trim() || 'INANIR-VINC-MERKEZ';
-      return 'ikv_sync_v10_' + clean.toLowerCase();
+      return 'ikv_sync_v11_' + clean.toLowerCase();
     }
 
     function buildCompactSyncPayload() {
-      // Bulut üzerinden anında senkronize olması için servis fişleri, makineler, firma bilgileri ve eklenen marka/modelleri paketle
+      // 4 KB (4096 byte) ntfy.sh inline mesaj sınırını aşmamak için yalnızca kullanıcı tarafından eklenen/düzenlenen
+      // servis fişlerini, makineleri, firma bilgilerini ve özel marka/modelleri paketle (değişmemiş örnek verileri çıkar)
+      const sampleFormMap = new Map(SAMPLE_SERVICE_FORMS.map(s => [s.id, JSON.stringify(s)]));
+      const sampleMacMap = new Map(SAMPLE_MACHINES.map(m => [m.id, JSON.stringify(m)]));
+
+      const userServiceForms = (store.serviceForms || []).filter(s => {
+        if (!s || !s.id) return false;
+        const copy = Object.assign({}, s);
+        delete copy.photos;
+        const rawSample = sampleFormMap.get(s.id);
+        if (!rawSample) return true; // Kullanıcı eklemiş
+        return JSON.stringify(copy) !== rawSample; // Kullanıcı örnek fişi düzenlemiş
+      }).map(s => {
+        const copy = Object.assign({}, s);
+        delete copy.photos;
+        return copy;
+      });
+
+      const userMachines = (store.machines || []).filter(m => {
+        if (!m || !m.id) return false;
+        const rawSample = sampleMacMap.get(m.id);
+        if (!rawSample) return true;
+        return JSON.stringify(m) !== rawSample;
+      });
+
+      // Silinmiş örnek kayıtların ID'lerini takip et
+      const currentIds = new Set([
+        ...(store.serviceForms || []).map(s => s.id),
+        ...(store.machines || []).map(m => m.id)
+      ]);
+      const deletedSampleIds = [
+        ...SAMPLE_SERVICE_FORMS.map(s => s.id).filter(id => !currentIds.has(id)),
+        ...SAMPLE_MACHINES.map(m => m.id).filter(id => !currentIds.has(id)),
+        ...(cloudSyncConfig.deletedIds || [])
+      ];
+
       const defaultBrandIds = new Set(CRANE_DATA.map(b => b.id));
       const customBrands = [];
       const customModelsByBrand = {};
@@ -23728,34 +23765,69 @@
         }
       });
 
+      const isCompanyModified = JSON.stringify(store.companyInfo) !== JSON.stringify(DEFAULT_COMPANY_INFO);
+
       return {
         ts: Date.now(),
         deviceId: cloudSyncConfig.deviceId,
         roomCode: cloudSyncConfig.roomCode,
-        companyInfo: store.companyInfo,
-        machines: store.machines || [],
-        serviceForms: (store.serviceForms || []).map(s => {
-          const copy = Object.assign({}, s);
-          delete copy.photos;
-          return copy;
-        }),
+        companyInfo: isCompanyModified ? store.companyInfo : null,
+        machines: userMachines,
+        serviceForms: userServiceForms,
+        deletedIds: Array.from(new Set(deletedSampleIds)),
         customBrands,
         customModelsByBrand,
         customCodesByModel
       };
     }
 
+    async function extractPayloadFromNtfyMessage(msg) {
+      if (!msg || msg.event !== 'message') return null;
+      // 1. Eğer mesaj 4 KB üstü olduğu için ntfy.sh tarafından dosyaya (attachment) dönüştürüldüyse URL'den indir
+      if (msg.attachment && msg.attachment.url) {
+        try {
+          const attRes = await fetch(msg.attachment.url);
+          if (attRes.ok) {
+            return await attRes.json();
+          }
+        } catch (e) {}
+      }
+      // 2. Doğrudan inline JSON mesajı ise parse et
+      if (msg.message && msg.message.trim().startsWith('{')) {
+        try {
+          return JSON.parse(msg.message);
+        } catch (e) {}
+      }
+      return null;
+    }
+
     function mergeIncomingCloudPayload(payload, showNotification = false) {
       if (!payload || typeof payload !== 'object') return false;
       let changed = false;
 
-      // 1. Servis Fişlerini Birleştir (En güncel olanları ve yeni eklenenleri koru)
+      // Silinen kayıtları uygula
+      const deletedSet = new Set(payload.deletedIds || []);
+      if (deletedSet.size > 0) {
+        const prevFormLen = (store.serviceForms || []).length;
+        store.serviceForms = (store.serviceForms || []).filter(f => !deletedSet.has(f.id));
+        if (store.serviceForms.length !== prevFormLen) changed = true;
+
+        const prevMacLen = (store.machines || []).length;
+        store.machines = (store.machines || []).filter(m => !deletedSet.has(m.id));
+        if (store.machines.length !== prevMacLen) changed = true;
+
+        cloudSyncConfig.deletedIds = Array.from(new Set([...(cloudSyncConfig.deletedIds || []), ...deletedSet]));
+      }
+
+      // 1. Servis Fişlerini Birleştir (Yeni eklenenleri en üste koy)
       if (Array.isArray(payload.serviceForms)) {
         const localForms = store.serviceForms || [];
         const byId = new Map();
         localForms.forEach(f => byId.set(f.id, f));
-        payload.serviceForms.forEach(remoteForm => {
-          if (!remoteForm || !remoteForm.id) return;
+        // Ters sırayla gez ki en üstteki en üstte kalsın
+        for (let i = payload.serviceForms.length - 1; i >= 0; i--) {
+          const remoteForm = payload.serviceForms[i];
+          if (!remoteForm || !remoteForm.id || deletedSet.has(remoteForm.id)) continue;
           if (!byId.has(remoteForm.id)) {
             localForms.unshift(remoteForm);
             byId.set(remoteForm.id, remoteForm);
@@ -23767,7 +23839,7 @@
               changed = true;
             }
           }
-        });
+        }
         store.serviceForms = localForms;
       }
 
@@ -23776,8 +23848,9 @@
         const localMachines = store.machines || [];
         const bySerial = new Map();
         localMachines.forEach(m => bySerial.set((m.serialNo || m.id).toLowerCase(), m));
-        payload.machines.forEach(remoteMac => {
-          if (!remoteMac || !remoteMac.serialNo) return;
+        for (let i = payload.machines.length - 1; i >= 0; i--) {
+          const remoteMac = payload.machines[i];
+          if (!remoteMac || !remoteMac.serialNo || deletedSet.has(remoteMac.id)) continue;
           const key = remoteMac.serialNo.toLowerCase();
           if (!bySerial.has(key)) {
             localMachines.unshift(remoteMac);
@@ -23790,7 +23863,7 @@
               changed = true;
             }
           }
-        });
+        }
         store.machines = localMachines;
       }
 
@@ -23827,6 +23900,23 @@
         });
       }
 
+      if (payload.customCodesByModel && typeof payload.customCodesByModel === 'object') {
+        store.brands.forEach(brand => {
+          (brand.models || []).forEach(model => {
+            const extraCodes = payload.customCodesByModel[model.id];
+            if (Array.isArray(extraCodes)) {
+              if (!model.codes) model.codes = [];
+              extraCodes.forEach(ec => {
+                if (!model.codes.some(c => c.id === ec.id || c.code === ec.code)) {
+                  model.codes.unshift(ec);
+                  changed = true;
+                }
+              });
+            }
+          });
+        });
+      }
+
       if (changed) {
         isSyncingFromCloud = true;
         try {
@@ -23834,7 +23924,7 @@
         } catch (e) {}
         isSyncingFromCloud = false;
 
-        // Aktif görünümü yenile
+        // Aktif görünümü anında yenile
         renderBrands(document.getElementById('inputBrandSearch')?.value || '');
         if (!document.getElementById('viewModelList').classList.contains('hidden')) renderModels();
         if (!document.getElementById('viewModelDetail').classList.contains('hidden')) renderModelDetail();
@@ -23842,7 +23932,7 @@
         if (!document.getElementById('viewFleet').classList.contains('hidden')) renderFleetView();
 
         if (showNotification) {
-          showToast('☁️ Buluttan yeni servis ve makine kayıtları eşitlendi!');
+          showToast('☁️ Buluttan yeni kayıtlar senkronize edildi!');
         }
       }
 
@@ -23881,9 +23971,10 @@
     }
 
     async function pushStoreToCloud(manual = false) {
-      if (!cloudSyncConfig.autoSync && !manual) return;
+      if (!cloudSyncConfig.autoSync && !manual) return false;
       const payload = buildCompactSyncPayload();
       const topic = getSanitizedRoomTopic();
+      const bodyStr = JSON.stringify(payload);
 
       try {
         updateCloudSyncUIStatus('Gönderiliyor...');
@@ -23892,32 +23983,30 @@
           const fbUrl = cloudSyncConfig.customFirebaseUrl.replace(/\/$/, '') + '/' + topic + '.json';
           await fetch(fbUrl, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: bodyStr
           });
         }
 
-        // 2. Anlık Bulut Kanalına (ntfy pub/sub cache) gönder
+        // 2. CORS preflight (OPTIONS) takılmasını önlemek için özel header kullanmadan doğrudan POST gönder
         const res = await fetch('https://ntfy.sh/' + topic, {
           method: 'POST',
-          headers: {
-            'Title': 'IKV_SYNC',
-            'Cache': 'yes'
-          },
-          body: JSON.stringify(payload)
+          body: bodyStr
         });
 
         if (res.ok) {
           cloudSyncConfig.lastSyncTimestamp = Date.now();
           saveCloudSyncConfig();
           updateCloudSyncUIStatus('Eşitlendi');
-          if (manual) showToast('☁️ Tüm kayıtlar buluta gönderildi! Diğer cihazlardan görebilirsiniz.');
+          if (manual) showToast('☁️ Tüm kayıtlar buluta gönderildi! Safari ve diğer cihazlardan görebilirsiniz.');
+          return true;
         } else {
           updateCloudSyncUIStatus('Çevrimdışı (Yerel)', true);
+          return false;
         }
       } catch (err) {
         updateCloudSyncUIStatus('Çevrimdışı (Yerel)', true);
         if (manual) showToast('İnternet bağlantısı kontrol ediliyor, yerel hafızaya kaydedildi.');
+        return false;
       }
     }
 
@@ -23935,46 +24024,57 @@
             if (fbData && fbData.ts) {
               mergeIncomingCloudPayload(fbData, manual);
               if (manual) showToast('🔄 Buluttaki tüm kayıtlar bu cihaza aktarıldı!');
-              return;
+              return true;
             }
           }
         }
 
-        // 2. Anlık Bulut Kanalından son durum mesajlarını çek
+        // 2. Anlık Bulut Kanalından geçmiş tüm mesajları çek ve sırayla birleştir
         const res = await fetch('https://ntfy.sh/' + topic + '/json?poll=1&since=all');
         if (res.ok) {
           const text = await res.text();
           const lines = text.trim().split('\n').filter(Boolean);
-          let latestPayload = null;
+          const payloads = [];
           for (const line of lines) {
             try {
               const msg = JSON.parse(line);
-              if (msg.event === 'message' && msg.message) {
-                const parsed = JSON.parse(msg.message);
-                if (parsed && parsed.ts) {
-                  if (!latestPayload || parsed.ts >= latestPayload.ts) {
-                    latestPayload = parsed;
-                  }
-                }
+              const extracted = await extractPayloadFromNtfyMessage(msg);
+              if (extracted && extracted.ts) {
+                payloads.push(extracted);
               }
             } catch (e) {}
           }
-          if (latestPayload) {
-            const updated = mergeIncomingCloudPayload(latestPayload, manual);
-            if (manual && !updated) {
+          if (payloads.length > 0) {
+            payloads.sort((a, b) => a.ts - b.ts);
+            let anyUpdated = false;
+            for (const p of payloads) {
+              if (mergeIncomingCloudPayload(p, false)) {
+                anyUpdated = true;
+              }
+            }
+            if (anyUpdated) {
+              showToast('☁️ Buluttaki yeni servis fişleri ve kayıtlar eşitlendi!');
+            } else if (manual) {
               showToast('✓ Tüm kayıtlarınız zaten güncel!');
             }
           } else {
-            // Kanalda henüz veri yoksa bu cihazdaki veriyi ilk kayıt olarak yükle
-            await pushStoreToCloud(false);
-            if (manual) showToast('☁️ Bulut odası oluşturuldu ve mevcut kayıtlarınız yüklendi!');
+            // Kanalda henüz veri yoksa ve bu cihazda kullanıcı verisi varsa gönder
+            const currentPayload = buildCompactSyncPayload();
+            if ((currentPayload.serviceForms && currentPayload.serviceForms.length > 0) ||
+                (currentPayload.machines && currentPayload.machines.length > 0) ||
+                currentPayload.companyInfo) {
+              await pushStoreToCloud(false);
+            }
+            if (manual) showToast('☁️ Bulut odası aktif ve senkronize!');
           }
           updateCloudSyncUIStatus('Eşitlendi');
+          return true;
         }
       } catch (err) {
         updateCloudSyncUIStatus('Çevrimdışı (Yerel)', true);
         if (manual) showToast('Buluta bağlanılamadı, internet bağlantınızı kontrol edin.');
       }
+      return false;
     }
 
     function startLiveCloudSubscription() {
@@ -23987,14 +24087,12 @@
       const topic = getSanitizedRoomTopic();
       try {
         cloudEventSource = new EventSource('https://ntfy.sh/' + topic + '/sse');
-        cloudEventSource.onmessage = function(event) {
+        cloudEventSource.onmessage = async function(event) {
           try {
             const data = JSON.parse(event.data);
-            if (data && data.message) {
-              const payload = JSON.parse(data.message);
-              if (payload && payload.deviceId !== cloudSyncConfig.deviceId) {
-                mergeIncomingCloudPayload(payload, true);
-              }
+            const payload = await extractPayloadFromNtfyMessage(data);
+            if (payload && payload.deviceId !== cloudSyncConfig.deviceId) {
+              mergeIncomingCloudPayload(payload, true);
             }
           } catch (e) {}
         };
@@ -24007,12 +24105,10 @@
       } catch (e) {
         console.warn('Depolama hatası:', e);
       }
-      // Her kayıt/değişiklik sonrası otomatik buluta eşitle (Ana Ekran <-> Safari <-> Diğer Cihazlar)
+      // Her kayıt/değişiklik sonrası gecikmesiz olarak buluta eşitle (Ana Ekrandan Safari'ye anında geçişte kaybolmaması için)
       if (!isSyncingFromCloud && cloudSyncConfig.autoSync) {
         if (cloudPushTimer) clearTimeout(cloudPushTimer);
-        cloudPushTimer = setTimeout(() => {
-          pushStoreToCloud(false);
-        }, 400);
+        pushStoreToCloud(false);
       }
     }
 function showToast(msg) {
@@ -25597,6 +25693,9 @@ function showToast(msg) {
       if (!store.serviceForms) return;
       const f = store.serviceForms.find(s => s.id === formId);
       const name = f ? f.formNo : 'Form';
+      if (!Array.isArray(cloudSyncConfig.deletedIds)) cloudSyncConfig.deletedIds = [];
+      if (!cloudSyncConfig.deletedIds.includes(formId)) cloudSyncConfig.deletedIds.push(formId);
+      saveCloudSyncConfig();
       store.serviceForms = store.serviceForms.filter(s => s.id !== formId);
       saveStore();
       renderServiceForms();
