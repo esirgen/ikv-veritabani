@@ -23973,6 +23973,7 @@
         try {
           localStorage.setItem('InanirKuleVinc_Store_v10', JSON.stringify(store));
         } catch (e) {}
+        saveStoreToIDB(store);
         isSyncingFromCloud = false;
 
         // Aktif görünümü anında yenile
@@ -24150,12 +24151,60 @@
       } catch (e) {}
     }
 
+    // BÜYÜK PDF VE ŞEMALAR İÇİN INDEXEDDB KALICI DEPOLAMA MOTORU (5MB SINIRINI AŞAR)
+    const IDB_NAME = 'InanirKuleVinc_IDB_v1';
+    const IDB_STORE = 'app_state';
+
+    function openAppIDB() {
+      return new Promise((resolve, reject) => {
+        if (!window.indexedDB) return reject(new Error('IndexedDB desteklenmiyor'));
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = function(e) {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(IDB_STORE)) {
+            db.createObjectStore(IDB_STORE);
+          }
+        };
+        req.onsuccess = function(e) { resolve(e.target.result); };
+        req.onerror = function(e) { reject(e.target.error); };
+      });
+    }
+
+    async function saveStoreToIDB(dataObj) {
+      try {
+        const db = await openAppIDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(IDB_STORE, 'readwrite');
+          tx.objectStore(IDB_STORE).put(dataObj, 'main_store');
+          tx.oncomplete = () => { db.close(); resolve(true); };
+          tx.onerror = (err) => { db.close(); reject(err); };
+        });
+      } catch (e) {
+        console.warn('IDB kayıt uyarısı:', e);
+      }
+    }
+
+    async function loadStoreFromIDB() {
+      try {
+        const db = await openAppIDB();
+        return new Promise((resolve) => {
+          const tx = db.transaction(IDB_STORE, 'readonly');
+          const req = tx.objectStore(IDB_STORE).get('main_store');
+          req.onsuccess = () => { db.close(); resolve(req.result || null); };
+          req.onerror = () => { db.close(); resolve(null); };
+        });
+      } catch (e) {
+        return null;
+      }
+    }
+
     function saveStore() {
       try {
         localStorage.setItem('InanirKuleVinc_Store_v10', JSON.stringify(store));
       } catch (e) {
-        console.warn('Depolama hatası:', e);
+        console.warn('localStorage kotası doldu, IndexedDB üzerinden tam kayıt devam ediyor:', e);
       }
+      saveStoreToIDB(store);
       // Her kayıt/değişiklik sonrası gecikmesiz olarak buluta eşitle (Ana Ekrandan Safari'ye anında geçişte kaybolmaması için)
       if (!isSyncingFromCloud && cloudSyncConfig.autoSync) {
         if (cloudPushTimer) clearTimeout(cloudPushTimer);
@@ -24900,11 +24949,15 @@ function showToast(msg) {
       showToast('Belge başarıyla silindi');
     }
 
-    // GÖRÜNTÜLEYİCİ, ÇOK SAYFALI PDF MOTORU & ANA EKRAN UYGULAMASI İNDİRME SİSTEMİ
+    // GÖRÜNTÜLEYİCİ, AKILLI BELLEK KORUMALI ÇOK SAYFALI PDF MOTORU & İNDİRME SİSTEMİ
     let currentZoom = 1;
     let currentViewingMediaId = null;
     let currentViewingMediaItem = null;
     let editingMediaNoteId = null;
+    let activePdfRenderSessionId = 0;
+    let activePdfDoc = null;
+    let activePdfObserver = null;
+    let activePdfBlobUrl = null;
 
     function dataUrlToBlob(dataUrl, fallbackMime = 'application/octet-stream') {
       try {
@@ -25042,15 +25095,42 @@ function showToast(msg) {
       }
     }
 
+    function cleanupActivePdfResources() {
+      activePdfRenderSessionId++;
+      if (activePdfObserver) {
+        try { activePdfObserver.disconnect(); } catch (e) {}
+        activePdfObserver = null;
+      }
+      const pdfPagesContainer = document.getElementById('viewerPdfPagesContainer');
+      if (pdfPagesContainer) {
+        pdfPagesContainer.querySelectorAll('canvas').forEach(c => {
+          c.width = 1;
+          c.height = 1;
+        });
+      }
+      if (activePdfDoc) {
+        try { activePdfDoc.destroy(); } catch (e) {}
+        activePdfDoc = null;
+      }
+      if (activePdfBlobUrl) {
+        try { URL.revokeObjectURL(activePdfBlobUrl); } catch (e) {}
+        activePdfBlobUrl = null;
+      }
+    }
+
     async function renderFullPdfInViewer(dataUrl) {
+      cleanupActivePdfResources();
+      const sessionId = activePdfRenderSessionId;
+
       const pdfPagesContainer = document.getElementById('viewerPdfPagesContainer');
       const iframe = document.getElementById('viewerPdfFrame');
       const pageCountBadge = document.getElementById('txtPdfPageCountBadge');
+      const viewerContainer = document.getElementById('viewerContainer');
 
       pdfPagesContainer.innerHTML = `
         <div class="py-12 text-center space-y-3">
-          <div class="inline-block w-8 h-8 border-3 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
-          <p class="text-xs font-bold text-amber-400">PDF tüm sayfalarıyla hazırlanıyor, lütfen bekleyin...</p>
+          <div class="inline-block w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+          <p class="text-xs font-bold text-amber-400">PDF şema hazırlanıyor, lütfen bekleyin...</p>
         </div>
       `;
       pdfPagesContainer.classList.remove('hidden');
@@ -25063,47 +25143,207 @@ function showToast(msg) {
         const blob = dataUrlToBlob(dataUrl, 'application/pdf');
         if (!blob) throw new Error('PDF verisi okunamadı');
         const arrayBuffer = await blob.arrayBuffer();
+        if (sessionId !== activePdfRenderSessionId) return;
 
-        const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
+        const loadingTask = window.pdfjsLib.getDocument({
+          data: new Uint8Array(arrayBuffer),
+          cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+          cMapPacked: true
+        });
         const pdfDoc = await loadingTask.promise;
+        if (sessionId !== activePdfRenderSessionId) {
+          pdfDoc.destroy();
+          return;
+        }
+        activePdfDoc = pdfDoc;
         const numPages = pdfDoc.numPages;
 
         if (pageCountBadge) {
-          pageCountBadge.innerText = `📄 Toplam ${numPages} Sayfa (Aşağı Kaydırarak Tümünü Okuyun)`;
+          pageCountBadge.innerText = `📄 Toplam ${numPages} Sayfa • Kesintisiz Akıllı Görünüm`;
           pageCountBadge.classList.remove('hidden');
         }
 
+        // İlk sayfanın oranını ölçerek diğer sayfalar için yer tutucu yüksekliği hesapla
+        const firstPage = await pdfDoc.getPage(1);
+        const firstVp = firstPage.getViewport({ scale: 1.0 });
+        const defaultAspect = (firstVp.height && firstVp.width) ? (firstVp.height / firstVp.width) : 1.414;
+        const containerWidth = Math.min((viewerContainer ? viewerContainer.clientWidth : window.innerWidth) - 24, 860);
+        const estimatedHeight = Math.max(260, Math.round(containerWidth * defaultAspect));
+
         pdfPagesContainer.innerHTML = '';
+
+        // Çok sayfalı PDF'lerde hızlı sayfa geçiş çubuğu
+        if (numPages > 1) {
+          const navBar = document.createElement('div');
+          navBar.className = 'sticky top-0 z-20 w-full bg-slate-900/95 backdrop-blur-md border border-amber-500/40 rounded-xl p-2 flex items-center justify-between gap-2 shadow-lg';
+          navBar.innerHTML = `
+            <button id="btnPdfPrevPage" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs border border-slate-700 active:scale-95 transition">◀ Önceki</button>
+            <div class="flex items-center gap-1.5 text-xs font-bold text-slate-200">
+              <span>Sayfa:</span>
+              <select id="selectPdfPageJump" class="bg-slate-950 border border-amber-500/50 text-amber-400 font-black rounded-lg px-2.5 py-1 text-xs focus:outline-none">
+                ${Array.from({ length: numPages }, (_, i) => `<option value="${i + 1}">${i + 1} / ${numPages}</option>`).join('')}
+              </select>
+            </div>
+            <button id="btnPdfNextPage" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs border border-slate-700 active:scale-95 transition">Sonraki ▶</button>
+          `;
+          pdfPagesContainer.appendChild(navBar);
+
+          const selectJump = navBar.querySelector('#selectPdfPageJump');
+          const scrollToPage = (pNum) => {
+            const target = document.getElementById(`pdf-page-slot-${pNum}`);
+            if (target) {
+              target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              if (selectJump) selectJump.value = String(pNum);
+            }
+          };
+          selectJump.addEventListener('change', (e) => scrollToPage(parseInt(e.target.value, 10)));
+          navBar.querySelector('#btnPdfPrevPage').addEventListener('click', () => {
+            const cur = parseInt(selectJump.value, 10) || 1;
+            if (cur > 1) scrollToPage(cur - 1);
+          });
+          navBar.querySelector('#btnPdfNextPage').addEventListener('click', () => {
+            const cur = parseInt(selectJump.value, 10) || 1;
+            if (cur < numPages) scrollToPage(cur + 1);
+          });
+        }
+
+        // Tüm sayfalar için hafif yer tutucu (slot) oluştur — hepsini aynı anda çizip iOS RAM sınırını patlatma!
+        const pageStates = new Map(); // pageNum -> { status: 'idle'|'rendering'|'rendered', wrapper, body, canvas }
 
         for (let pageNum = 1; pageNum <= numPages; pageNum++) {
           const pageWrapper = document.createElement('div');
+          pageWrapper.id = `pdf-page-slot-${pageNum}`;
+          pageWrapper.dataset.pageNumber = String(pageNum);
           pageWrapper.className = 'w-full bg-slate-900 border border-slate-800 rounded-xl p-2 sm:p-3 shadow-xl flex flex-col items-center gap-2';
 
           const pageHeader = document.createElement('div');
-          pageHeader.className = 'w-full flex items-center justify-between text-[11px] font-bold text-slate-300 px-2 py-1 bg-slate-950 rounded-lg border border-slate-800';
+          pageHeader.className = 'w-full flex items-center justify-between text-[11px] font-bold text-slate-300 px-2.5 py-1 bg-slate-950 rounded-lg border border-slate-800';
           pageHeader.innerHTML = `
             <span class="text-amber-400">📄 Sayfa ${pageNum} / ${numPages}</span>
             <span class="text-[10px] text-slate-400">İnanır Kule Vinç Şema Arşivi</span>
           `;
 
-          const canvas = document.createElement('canvas');
-          canvas.className = 'w-full h-auto rounded-lg bg-white shadow';
+          const pageBody = document.createElement('div');
+          pageBody.className = 'w-full flex items-center justify-center bg-slate-950/60 rounded-lg overflow-hidden relative';
+          pageBody.style.minHeight = `${estimatedHeight}px`;
+          pageBody.innerHTML = `
+            <div class="text-center py-8 space-y-2 text-slate-400 text-xs">
+              <div class="inline-block w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+              <div>Sayfa ${pageNum} yükleniyor...</div>
+            </div>
+          `;
 
           pageWrapper.appendChild(pageHeader);
-          pageWrapper.appendChild(canvas);
+          pageWrapper.appendChild(pageBody);
           pdfPagesContainer.appendChild(pageWrapper);
 
-          const page = await pdfDoc.getPage(pageNum);
-          // Yüksek netlik için ölçekleme (Retina ekran uyumlu)
-          const viewport = page.getViewport({ scale: 2.0 });
-          const context = canvas.getContext('2d');
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
+          pageStates.set(pageNum, {
+            status: 'idle',
+            wrapper: pageWrapper,
+            body: pageBody,
+            canvas: null
+          });
+        }
 
-          await page.render({
-            canvasContext: context,
-            viewport: viewport
-          }).promise;
+        // Bellek Korumalı Tekil Sayfa Çizici (iOS Safari 256MB Canvas RAM limitini asla aşmaz)
+        async function renderSinglePageSlot(pageNum) {
+          if (sessionId !== activePdfRenderSessionId || !activePdfDoc) return;
+          const st = pageStates.get(pageNum);
+          if (!st || st.status === 'rendering' || st.status === 'rendered') return;
+          st.status = 'rendering';
+
+          try {
+            const page = await activePdfDoc.getPage(pageNum);
+            if (sessionId !== activePdfRenderSessionId) return;
+
+            const baseVp = page.getViewport({ scale: 1.0 });
+            // Geniş CAD/elektrik şemalarında tek sayfa boyutunun 1600px'i aşmasını önleyerek iOS WebKit çökmesini engelle
+            const maxDim = Math.max(baseVp.width || 800, baseVp.height || 1100);
+            const safeScale = Math.min(1.6, Math.max(0.85, 1550 / maxDim));
+            const viewport = page.getViewport({ scale: safeScale });
+
+            const canvas = document.createElement('canvas');
+            canvas.className = 'w-full h-auto rounded-lg bg-white shadow block';
+            const ctx = canvas.getContext('2d', { alpha: false });
+            canvas.width = Math.floor(viewport.width);
+            canvas.height = Math.floor(viewport.height);
+
+            await page.render({
+              canvasContext: ctx,
+              viewport: viewport
+            }).promise;
+
+            if (sessionId !== activePdfRenderSessionId) {
+              canvas.width = 1;
+              canvas.height = 1;
+              return;
+            }
+
+            st.body.innerHTML = '';
+            st.body.style.minHeight = '';
+            st.body.appendChild(canvas);
+            st.canvas = canvas;
+            st.status = 'rendered';
+            if (page.cleanup) page.cleanup();
+          } catch (pageErr) {
+            st.status = 'idle';
+            st.body.innerHTML = `<div class="p-6 text-center text-xs text-amber-400">Sayfa ${pageNum} tekrar yüklenmek üzere hazır.</div>`;
+          }
+        }
+
+        // Ekrandan uzaklaşan sayfaların Canvas belleğini boşalt (Çok sayfalı PDF'lerde kapanmayı %100 önler)
+        function releaseDistantPages(centerPageNum) {
+          const KEEP_RADIUS = 3; // Aktif sayfanın ±3 sayfası bellekte tutulur (en fazla 7 canvas)
+          pageStates.forEach((st, pNum) => {
+            if (st.status === 'rendered' && Math.abs(pNum - centerPageNum) > KEEP_RADIUS) {
+              const currentH = st.body.clientHeight || estimatedHeight;
+              if (st.canvas) {
+                st.canvas.width = 1;
+                st.canvas.height = 1;
+                st.canvas.remove();
+                st.canvas = null;
+              }
+              st.body.style.minHeight = `${currentH}px`;
+              st.body.innerHTML = `<div class="text-center py-8 text-slate-500 text-xs">Sayfa ${pNum}</div>`;
+              st.status = 'idle';
+            }
+          });
+        }
+
+        // İlk 2 sayfayı hemen çiz
+        await renderSinglePageSlot(1);
+        if (numPages >= 2) await renderSinglePageSlot(2);
+
+        // Kaydırma esnasında görünür sayfaları otomatik çizen IntersectionObserver
+        if ('IntersectionObserver' in window) {
+          activePdfObserver = new IntersectionObserver((entries) => {
+            if (sessionId !== activePdfRenderSessionId) return;
+            entries.forEach(entry => {
+              if (entry.isIntersecting) {
+                const pNum = parseInt(entry.target.dataset.pageNumber, 10);
+                if (!pNum) return;
+                const selectJump = document.getElementById('selectPdfPageJump');
+                if (selectJump) selectJump.value = String(pNum);
+                renderSinglePageSlot(pNum);
+                if (pNum + 1 <= numPages) renderSinglePageSlot(pNum + 1);
+                if (pNum - 1 >= 1) renderSinglePageSlot(pNum - 1);
+                if (numPages > 8) releaseDistantPages(pNum);
+              }
+            });
+          }, {
+            root: viewerContainer,
+            rootMargin: '900px 0px 900px 0px',
+            threshold: 0.01
+          });
+
+          pageStates.forEach((st) => {
+            activePdfObserver.observe(st.wrapper);
+          });
+        } else {
+          // Eski tarayıcı fallback: ilk 5 sayfayı sırayla çiz
+          for (let p = 3; p <= Math.min(numPages, 5); p++) {
+            await renderSinglePageSlot(p);
+          }
         }
       } catch (err) {
         console.warn('PDF.js render hatası, alternatif görünüme geçiliyor:', err);
@@ -25112,7 +25352,8 @@ function showToast(msg) {
         iframe.classList.remove('hidden');
         const blob = dataUrlToBlob(dataUrl, 'application/pdf');
         if (blob) {
-          iframe.src = URL.createObjectURL(blob);
+          activePdfBlobUrl = URL.createObjectURL(blob);
+          iframe.src = activePdfBlobUrl;
         } else {
           iframe.src = dataUrl;
         }
@@ -25164,6 +25405,7 @@ function showToast(msg) {
     }
 
     function closeViewer() {
+      cleanupActivePdfResources();
       document.getElementById('modalViewer').classList.add('hidden');
       document.getElementById('viewerPdfFrame').src = '';
       document.getElementById('viewerImage').src = '';
@@ -26890,6 +27132,23 @@ function showToast(msg) {
       loadCloudSyncConfig();
       loadStore();
       renderBrands();
+      // Büyük PDF dosyaları localStorage 5MB sınırını aştığında IndexedDB'den geri yükle
+      loadStoreFromIDB().then(idbData => {
+        if (idbData && Array.isArray(idbData.brands)) {
+          const countMedia = (brandsList) => (brandsList || []).reduce((acc, b) => acc + (b.models || []).reduce((mAcc, m) => mAcc + ((m.media && m.media.length) || 0), 0), 0);
+          if (countMedia(idbData.brands) >= countMedia(store.brands)) {
+            store.brands = idbData.brands;
+            if (idbData.serviceForms && idbData.serviceForms.length >= (store.serviceForms || []).length) store.serviceForms = idbData.serviceForms;
+            if (idbData.machines && idbData.machines.length >= (store.machines || []).length) store.machines = idbData.machines;
+            if (idbData.companyInfo) store.companyInfo = idbData.companyInfo;
+            mergeWithDefaultLibraries();
+            applyCompanyInfoToUI();
+            renderBrands(document.getElementById('inputBrandSearch')?.value || '');
+            if (!document.getElementById('viewModelList').classList.contains('hidden')) renderModels();
+            if (!document.getElementById('viewModelDetail').classList.contains('hidden')) renderModelDetail();
+          }
+        }
+      });
 
       // Açılışta ve uygulama/sekme görünür olduğunda (Ana Ekrandan Safari'ye geçince) buluttan otomatik çek
       setTimeout(() => {
