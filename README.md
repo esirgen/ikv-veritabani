@@ -1,83 +1,35 @@
-# 🏗️ İnanır Kule Vinç - Saha Arşiv & Sürücü Teşhis Sistemi (GitHub Pages)
+# İnanır Kule Vinç - Saha Teknik Arşiv & Sürücü Teşhis Sistemi (v8.2)
 
-Bu depo, **İnanır Kule Vinç** şantiye ve saha operasyonları için geliştirilmiş **PWA (Progressive Web App)** tabanlı teknik arşiv, resmi servis fişi düzenleme ve sürücü (inverter) teşhis sistemidir.
-
-GitHub Pages üzerinde **tamamen ücretsiz, sıfır sunucu maliyetiyle ve 7/24 kesintisiz** çalışır.
+Bu uygulama, **İnanır Kule Vinç** saha ve servis operasyonlarında kullanılmak üzere tasarlanmıştır. Telefonunuzun **Dosyalar (Files)** bölümündeki elektronik bağlantı şemalarını (PDF), galerinizdeki denge/karşı ağırlık şemalarını, resmi saha servis fişlerini ve 16 farklı inverter modeline ait arıza kodları ile parametrelerini içerir.
 
 ---
 
-## 🚀 3 Adımda GitHub Pages ile Canlıya Alma (Kurulum)
+## 🛠️ v8.2 Sürüm Düzeltmeleri & Safari Çözümleri
 
-Hiçbir kodlama veya terminal bilgisine gerek yoktur. Web tarayıcınızdan 2 dakikada yayına alabilirsiniz:
+### 1. "Renksiz Düz A4 Kağıt Gibi Açılma" Sorununun Çözümü:
+- **Sorunun Nedeni:** Dosya Safari'de yerel dosya (`file:///`) olarak açıldığında veya internet bağlantısı zayıf olduğunda, harici CDN (`cdn.tailwindcss.com`) engelleniyor ve sayfa stilleri yüklenemiyordu.
+- **Yapılan Düzeltme:** Tüm Tailwind CSS stilleri, karanlık tema renkleri (`#020617`, `#0f172a`, `#f59e0b`), grid/flex hizalamaları ve responsive kuralları doğrudan `index.html` içerisindeki `<style>` bloğuna gömülü (self-contained) hale getirildi. Artık internet veya harici CDN bağlantısı OLMADAN, uçak modunda dahi altın sarısı ve lacivert arayüz kusursuz açılır.
 
-### 1. Adım: GitHub'da Yeni Depo (Repository) Açın
-1. [GitHub.com](https://github.com) hesabınıza giriş yapın (hesabınız yoksa ücretsiz kaydolun).
-2. Sağ üstteki **+** simgesine tıklayıp **"New repository"** seçin.
-3. Repository name kısmına örneğin **`inanir-vinc`** veya **`saha`** yazın.
-4. Görünürlüğü **Public** (Herkese Açık) seçin.
-5. Alttaki yeşil **"Create repository"** butonuna basın.
-
-### 2. Adım: Dosyaları Yükleyin
-1. Açılan boş repository sayfasında **"uploading an existing file"** linkine tıklayın.
-2. Bu klasördeki dosyaları (özellikle **`index.html`**, **`.nojekyll`**, **`manifest.json`**, **`inanir_kule_vinc_icon.png`**) tarayıcıya sürükleyip bırakın.
-3. Sayfanın altındaki yeşil **"Commit changes"** butonuna basın.
-
-### 3. Adım: GitHub Pages'i Aktif Edin (1 Tıkla Yayın)
-1. Deponuzun üst menüsündeki **"Settings" (Ayarlar)** sekmesine tıklayın.
-2. Sol menüden **"Pages"** başlığını seçin.
-3. **Build and deployment > Branch** kısmında:
-   - `None` yazan yeri **`main`** (veya `master`) olarak seçin.
-   - Klasör olarak **`/(root)`** seçin.
-4. **"Save" (Kaydet)** butonuna tıklayın.
-
-🎉 **Tebrikler!** 1-2 dakika içinde sayfanın üstünde yeşil kutuda canlı web adresiniz belirecektir:
-> **`https://<kullanici-adiniz>.github.io/<repo-adiniz>/`**  
-> *(Örnek: `https://ahmetinanir.github.io/inanir-vinc/`)*
+### 2. "Donma ve Hiçbir Şeyin Görünmemesi" Sorununun Çözümü:
+- **Sorunun Nedeni:** İndirme fonksiyonundaki satır sonu kaçış hatası nedeniyle JavaScript motoru `SyntaxError` verip kilitleniyordu; bu yüzden `DOMContentLoaded` tetiklenmiyor ve markalar listelenemiyordu.
+- **Yapılan Düzeltme:** JavaScript kodu Node.js motorunda derleme testlerinden (`node -c`) geçirilerek sıfır hata ile düzeltildi. Sayfa açılır açılmaz tüm markalar, inverterler ve servis fişleri anında listelenir.
 
 ---
 
-## 📲 Çalışanlara ve iPhone'a Kurulum (Safari Yöntemi)
+## 📱 iPhone 17 Pro Max Kurulumu
 
-Canlı linkinizi 5 saha çalışanınıza WhatsApp'tan gönderin. Her çalışan kendi telefonunda:
-
-1. Linke **Safari** tarayıcısında dokunup açar.
-2. Alt araç çubuğundaki **Paylaş** (kare ve yukarı ok) simgesine dokunur.
-3. Menüyü kaydırıp **"Ana Ekrana Ekle" (Add to Home Screen)** seçeneğini seçer.
-4. Sağ üstteki **"Ekle"** butonuna basar.
-
-Artık telefonun ana ekranında özel **İnanır Kule Vinç** ikonu yer alır. Dokunulduğunda Safari adres çubukları gizlenir, tam ekran bir iPhone uygulaması olarak açılır ve **şantiyede internet çekmese dahi %100 çevrimdışı (offline)** çalışır.
+1. ZIP içindeki `index.html` dosyasını telefonunuza kaydedin (örneğin Dosyalar > İndirilenler).
+2. Dosyaya dokunarak Safari'de açın.
+3. Safari ekranının altındaki **Paylaş (kare içinde yukarı ok)** simgesine dokunun.
+4. **"Ana Ekrana Ekle"** seçeneğini seçip sağ üstteki **Ekle** butonuna basın.
+5. Altın vinç logolu bağımsız bir iOS uygulaması olarak telefonunuza yerleşecek ve çevrimdışı çalışacaktır.
 
 ---
 
-## 🌟 Sistem Özellikleri
+## 📁 Paket İçeriği
 
-- **🏗️ 10 Kule Vinç Markası & Modelleri:** Potain, Liebherr, Comansa, Zoomlion, Jaso, Towerwork, FM Gru, Dahan, Raimondi, Saez, Terex vb.
-- **🎛️ 9 Büyük İnverter Teşhis Kütüphanesi:** Sinee EM730/EM760, Schneider ATV71/ATV340/ATV320, Inovance CS710/MD500/HD92, Mitsubishi FR-A800/A700, Omron Varispeed F7, Yaskawa A1000, KEB F5, Siemens G120, ABB ACS880, Danfoss FC302, Fuji Frenic.
-  - **362+ Fabrika Arıza Kodu:** Olası nedenler ve sahada kesin çözüm adımları.
-  - **445+ Kritik Parametre:** Vinç güvenlik mantığı, fabrika değeri ve olması gereken çalışma değerleri.
-- **📋 Resmi Servis & Müdahale Formu:** Şantiyede yapılan montaj, demontaj, arıza ve periyodik bakımları A4 formatında yazdırma veya WhatsApp üzerinden tek tıkla resmi rapor gönderme.
-- **🔢 Makine Seri No Kütüğü & Fotoğraflı Şecere:** Kule vincin seri numarasını yazarak bugüne kadar yapılan tüm tamirleri, değişen parçaları ve çekilen saha fotoğraflarını tarih sırasıyla görme.
-- **👥 Canlı Ekip (Online) Senkronizasyonu:** Patron ve 5 çalışan arasında tek bir şirket anahtarıyla (Sync Key) veri eşitleme.
-- **💾 Yerel & Güvenli Depolama:** Yüklenen fotoğraflar, şemalar ve fişler cihazın güvenli hafızasında (`localStorage` / `IndexedDB`) saklanır, JSON olarak dışa aktarılabilir.
-
----
-
-## 📁 Depo Dosya Yapısı
-
-```text
-├── index.html                  # Tüm uygulamanın çalıştığı ana PWA tek sayfa uygulaması
-├── .nojekyll                   # GitHub Pages'in özel dosyaları filtrelemesini engelleyen kural
-├── manifest.json               # Mobil cihazlar için PWA uygulama manifestosu
-├── inanir_kule_vinc_icon.png   # 512x512 iOS & Android uygulama ikonu
-├── inanir_kule_vinc_icon.svg   # Vektörel kule vinç simgesi
-├── inanir_kule_vinc_logo.svg   # Şirket antet vektör logosu
-├── DataModel.json              # Ham marka, model ve sürücü veritabanı (Yedek)
-├── company_settings.json       # Varsayılan firma antet ayarları
-└── README.md                   # Bu rehber dokümanı
-```
-
----
-
-## 🏢 İletişim & Destek
-**İnanır Kule Vinç San. ve Tic. Ltd. Şti.**  
-Saha Teknik Arşiv & Sürücü Teşhis Merkezi  
+- `index.html`: %100 çevrimdışı, bağımsız çalışan kule vinç web uygulaması.
+- `DataModel.json`: 17 kule vinç markası ve 16 inverter modelinin tam teknik veritabanı.
+- `Kule_Vinc_Surucu_ve_Elektronik_Sema_Rehberi.pdf`: 21 sayfalık basılı teknik el kitabı.
+- `InanirKuleVincApp.swift`: SwiftUI yerel iOS uygulama kaynak kodu.
+- `README.md`: Kullanım ve teknik kılavuz.
