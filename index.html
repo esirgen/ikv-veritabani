@@ -413,6 +413,33 @@
             <input type="text" id="inputUploadPhotoTitle" placeholder="Başlık (İsteğe bağlı, örn: 60m Bom Balast Dizilimi)..." class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500">
             <input type="text" id="inputUploadPhotoNote" placeholder="Fotoğraf notu yazın (örn: 18.5 ton karşı ağırlık, 3 adet 3t + 3 adet 3.1t taş dizilimi)..." class="sm:col-span-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500">
           </div>
+          <!-- Uzaktaki Cihazlar İçin Bulut Eşitleme & Harici Link Ekleme Alanı -->
+          <div class="pt-2 border-t border-slate-800/80 space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              <span class="text-sky-400 font-bold flex items-center gap-1.5">
+                <span>☁️</span>
+                <span>Eklenen PDF ve görseller <strong>Bulut Eşitleme Kodu</strong> ile uzaktaki cihazlara otomatik aktarılır.</span>
+              </span>
+              <button type="button" id="btnToggleCloudLinkBox" class="bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 font-bold px-2.5 py-1 rounded-lg text-[11px] transition active:scale-95">
+                🔗 Drive / iCloud Linki Ekle
+              </button>
+            </div>
+            <div id="cloudLinkInputBox" class="hidden bg-slate-950 border border-sky-500/30 rounded-xl p-2.5 space-y-2">
+              <p class="text-[10px] text-slate-400">
+                Çok yüksek boyutlu PDF kataloglarını Google Drive, iCloud Drive, Yandex Disk veya OneDrive'a yükleyip paylaşım linkini buraya yapıştırabilirsiniz. Uzaktaki tüm cihazlar tek dokunuşla açabilir:
+              </p>
+              <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                <select id="selectCloudLinkCategory" class="bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-amber-400 font-bold focus:outline-none focus:border-sky-400">
+                  <option value="electronic">📄 Elektronik Şema (PDF)</option>
+                  <option value="balance">🖼️ Denge / Saha Görseli</option>
+                </select>
+                <input type="url" id="inputCloudExternalUrl" placeholder="https://drive.google.com/... veya PDF/Görsel linki yapıştırın" class="sm:col-span-2 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400">
+                <button type="button" id="btnSaveCloudExternalLink" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-black px-3 py-2 rounded-xl text-xs transition shadow active:scale-95">
+                  + Linki Modele Ekle
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Kategori Filtresi -->
@@ -23772,6 +23799,31 @@
       const customBrands = [];
       const customModelsByBrand = {};
       const customCodesByModel = {};
+      const customMediaByModel = {};
+
+      function serializeSyncMediaItem(med) {
+        if (!med || !med.id) return null;
+        const copy = {
+          id: med.id,
+          title: med.title || 'Belge',
+          category: med.category || 'electronic',
+          type: med.type || 'pdf',
+          date: med.date || '',
+          notes: med.notes || '',
+          externalUrl: med.externalUrl || ''
+        };
+        if (med.externalUrl) {
+          copy.data = med.externalUrl;
+        } else if (med.thumbData && med.thumbData.length < 45000) {
+          copy.thumbData = med.thumbData;
+          copy.data = 'idb://' + med.id;
+        } else if (med.data && med.data.length < 45000) {
+          copy.data = med.data;
+        } else {
+          copy.data = 'idb://' + med.id;
+        }
+        return copy;
+      }
 
       (store.brands || []).forEach(b => {
         if (!defaultBrandIds.has(b.id)) {
@@ -23786,7 +23838,8 @@
               jibLengthMeters: m.jibLengthMeters,
               tipLoadTons: m.tipLoadTons,
               description: m.description,
-              codes: m.codes || []
+              codes: m.codes || [],
+              media: (m.media || []).map(serializeSyncMediaItem).filter(Boolean)
             }))
           });
         } else {
@@ -23802,7 +23855,8 @@
                 jibLengthMeters: m.jibLengthMeters,
                 tipLoadTons: m.tipLoadTons,
                 description: m.description,
-                codes: m.codes || []
+                codes: m.codes || [],
+                media: (m.media || []).map(serializeSyncMediaItem).filter(Boolean)
               });
             } else {
               const defModel = (defBrand?.models || []).find(dm => dm.id === m.id);
@@ -23810,6 +23864,11 @@
               const extraCodes = (m.codes || []).filter(c => !defCodeIds.has(c.id));
               if (extraCodes.length > 0) {
                 customCodesByModel[m.id] = extraCodes;
+              }
+              const defMediaIds = new Set((defModel?.media || []).map(dmed => dmed.id));
+              const extraMedia = (m.media || []).filter(med => !defMediaIds.has(med.id) || med.notes !== (defModel?.media?.find(x => x.id === med.id)?.notes));
+              if (extraMedia.length > 0) {
+                customMediaByModel[m.id] = extraMedia.map(serializeSyncMediaItem).filter(Boolean);
               }
             }
           });
@@ -23828,7 +23887,8 @@
         deletedIds: Array.from(new Set(deletedSampleIds)),
         customBrands,
         customModelsByBrand,
-        customCodesByModel
+        customCodesByModel,
+        customMediaByModel
       };
     }
 
@@ -23927,12 +23987,70 @@
         }
       }
 
-      // 4. Özel Eklenen Markaları ve Modelleri Birleştir
+      // Silinen medya veya modelleri de temizle
+      if (deletedSet.size > 0) {
+        (store.brands || []).forEach(b => {
+          const prevModLen = (b.models || []).length;
+          b.models = (b.models || []).filter(m => !deletedSet.has(m.id));
+          if (b.models.length !== prevModLen) changed = true;
+          (b.models || []).forEach(m => {
+            const prevMedLen = (m.media || []).length;
+            m.media = (m.media || []).filter(med => !deletedSet.has(med.id));
+            if (m.media.length !== prevMedLen) changed = true;
+          });
+        });
+      }
+
+      function mergeModelMediaList(targetModel, incomingMediaList) {
+        if (!Array.isArray(incomingMediaList)) return false;
+        if (!Array.isArray(targetModel.media)) targetModel.media = [];
+        let mediaChanged = false;
+        for (let i = incomingMediaList.length - 1; i >= 0; i--) {
+          const rMed = incomingMediaList[i];
+          if (!rMed || !rMed.id || deletedSet.has(rMed.id)) continue;
+          const existingMed = targetModel.media.find(x => x.id === rMed.id);
+          if (!existingMed) {
+            targetModel.media.unshift(rMed);
+            mediaChanged = true;
+          } else {
+            if (rMed.title && existingMed.title !== rMed.title) { existingMed.title = rMed.title; mediaChanged = true; }
+            if (rMed.notes && existingMed.notes !== rMed.notes) { existingMed.notes = rMed.notes; mediaChanged = true; }
+            if (rMed.externalUrl && existingMed.externalUrl !== rMed.externalUrl) { existingMed.externalUrl = rMed.externalUrl; mediaChanged = true; }
+            if (rMed.thumbData && !existingMed.thumbData) { existingMed.thumbData = rMed.thumbData; mediaChanged = true; }
+          }
+        }
+        return mediaChanged;
+      }
+
+      // 4. Özel Eklenen Markaları, Modelleri ve Medyalarını Birleştir
       if (Array.isArray(payload.customBrands)) {
         payload.customBrands.forEach(cb => {
-          if (!store.brands.some(b => b.id === cb.id || b.name.toLowerCase() === cb.name.toLowerCase())) {
+          if (!cb || deletedSet.has(cb.id)) return;
+          let existingBrand = store.brands.find(b => b.id === cb.id || b.name.toLowerCase() === cb.name.toLowerCase());
+          if (!existingBrand) {
             store.brands.push(cb);
             changed = true;
+          } else {
+            if (!Array.isArray(existingBrand.models)) existingBrand.models = [];
+            (cb.models || []).forEach(cm => {
+              if (!cm || deletedSet.has(cm.id)) return;
+              let existingMod = existingBrand.models.find(m => m.id === cm.id || m.name.toLowerCase() === cm.name.toLowerCase());
+              if (!existingMod) {
+                existingBrand.models.push(cm);
+                changed = true;
+              } else {
+                if (mergeModelMediaList(existingMod, cm.media)) changed = true;
+                if (Array.isArray(cm.codes)) {
+                  if (!existingMod.codes) existingMod.codes = [];
+                  cm.codes.forEach(ec => {
+                    if (!existingMod.codes.some(c => c.id === ec.id || c.code === ec.code)) {
+                      existingMod.codes.unshift(ec);
+                      changed = true;
+                    }
+                  });
+                }
+              }
+            });
           }
         });
       }
@@ -23942,9 +24060,22 @@
           const brand = store.brands.find(b => b.id === brandId);
           if (brand) {
             (payload.customModelsByBrand[brandId] || []).forEach(cm => {
-              if (!brand.models.some(m => m.id === cm.id || m.name.toLowerCase() === cm.name.toLowerCase())) {
+              if (!cm || deletedSet.has(cm.id)) return;
+              let existingMod = brand.models.find(m => m.id === cm.id || m.name.toLowerCase() === cm.name.toLowerCase());
+              if (!existingMod) {
                 brand.models.push(cm);
                 changed = true;
+              } else {
+                if (mergeModelMediaList(existingMod, cm.media)) changed = true;
+                if (Array.isArray(cm.codes)) {
+                  if (!existingMod.codes) existingMod.codes = [];
+                  cm.codes.forEach(ec => {
+                    if (!existingMod.codes.some(c => c.id === ec.id || c.code === ec.code)) {
+                      existingMod.codes.unshift(ec);
+                      changed = true;
+                    }
+                  });
+                }
               }
             });
           }
@@ -23963,6 +24094,17 @@
                   changed = true;
                 }
               });
+            }
+          });
+        });
+      }
+
+      if (payload.customMediaByModel && typeof payload.customMediaByModel === 'object') {
+        store.brands.forEach(brand => {
+          (brand.models || []).forEach(model => {
+            const extraMedia = payload.customMediaByModel[model.id];
+            if (Array.isArray(extraMedia)) {
+              if (mergeModelMediaList(model, extraMedia)) changed = true;
             }
           });
         });
@@ -24468,18 +24610,19 @@ function showToast(msg) {
         card.className = 'bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col group';
         
         let previewHtml = '';
+        const imgPreviewSrc = (item.data && !item.data.startsWith('idb://')) ? item.data : (item.thumbData || '');
         if (item.type === 'pdf') {
           previewHtml = `
-            <div class="h-28 bg-slate-800 flex flex-col items-center justify-center text-red-400 gap-1 cursor-pointer">
-              <span class="text-3xl">📄</span>
-              <span class="text-[10px] font-bold text-white uppercase tracking-wider">PDF ŞEMA</span>
-              <span class="text-[9px] text-slate-400">Dokunup Oku</span>
+            <div class="h-28 bg-slate-800 flex flex-col items-center justify-center text-red-400 gap-1 cursor-pointer relative">
+              <span class="text-3xl">${item.externalUrl ? '🔗' : '📄'}</span>
+              <span class="text-[10px] font-bold text-white uppercase tracking-wider">${item.externalUrl ? 'BULUT PDF LİNKİ' : 'PDF ŞEMA'}</span>
+              <span class="text-[9px] text-amber-400 font-semibold">Dokunup Aç</span>
             </div>
           `;
         } else {
           previewHtml = `
-            <div class="h-28 bg-slate-800 overflow-hidden relative cursor-pointer">
-              <img src="${item.data}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform">
+            <div class="h-28 bg-slate-800 overflow-hidden relative cursor-pointer flex items-center justify-center">
+              ${imgPreviewSrc ? `<img src="${imgPreviewSrc}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform">` : `<span class="text-2xl">🖼️</span>`}
               <span class="absolute top-1.5 left-1.5 text-[9px] font-black bg-black/70 text-amber-400 px-1.5 py-0.5 rounded">
                 ${item.category === 'balance' ? '⚖️ DENGE' : '⚡ ŞEMA'}
               </span>
@@ -25017,12 +25160,172 @@ function showToast(msg) {
       }
     }
 
+    function getSanitizedMediaTopic(mediaId) {
+      const baseTopic = getSanitizedRoomTopic();
+      const cleanMediaId = String(mediaId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+      return baseTopic + '_m_' + cleanMediaId;
+    }
+
+    function blobToDataUrl(blob) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result || '');
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    async function pushMediaBlobToCloud(mediaId, blobOrFile) {
+      if (!mediaId || !blobOrFile) return false;
+      const mediaTopic = getSanitizedMediaTopic(mediaId);
+      try {
+        // 1. Özel Firebase RTDB tanımlıysa oraya da yaz
+        if (cloudSyncConfig.customFirebaseUrl && cloudSyncConfig.customFirebaseUrl.startsWith('http')) {
+          const dataUrl = await blobToDataUrl(blobOrFile);
+          if (dataUrl) {
+            const fbUrl = cloudSyncConfig.customFirebaseUrl.replace(/\/$/, '') + '/' + mediaTopic + '.json';
+            await fetch(fbUrl, {
+              method: 'PUT',
+              body: JSON.stringify({ mediaId, mime: blobOrFile.type || 'application/pdf', dataUrl, ts: Date.now() })
+            });
+          }
+        }
+
+        // 2. Doğrudan ikili (binary) gövdeyi veya parçalara bölünmüş base64 paketini ntfy bulut kanalına yükle
+        // ntfy.sh PUT/POST ile doğrudan binary dosya (attachment) veya metin destekler
+        const res = await fetch('https://ntfy.sh/' + mediaTopic, {
+          method: 'PUT',
+          body: blobOrFile
+        });
+        if (res.ok) return true;
+
+        // Fallback: Eğer PUT attachment sınırına takılırsa 2800 baytlık sıralı paketler halinde gönder
+        const dataUrl = await blobToDataUrl(blobOrFile);
+        if (dataUrl && dataUrl.length <= 450000) {
+          const chunkSize = 2800;
+          const totalChunks = Math.ceil(dataUrl.length / chunkSize);
+          const transferId = 'tr_' + Date.now();
+          for (let idx = 0; idx < totalChunks; idx++) {
+            const part = dataUrl.slice(idx * chunkSize, (idx + 1) * chunkSize);
+            await fetch('https://ntfy.sh/' + mediaTopic, {
+              method: 'POST',
+              body: JSON.stringify({ t: transferId, i: idx, n: totalChunks, d: part })
+            });
+          }
+          return true;
+        }
+      } catch (e) {
+        console.warn('Bulut medya yükleme uyarısı:', e);
+      }
+      return false;
+    }
+
+    async function pullMediaBlobFromCloud(mediaId, expectedType = 'pdf') {
+      if (!mediaId) return null;
+      const mediaTopic = getSanitizedMediaTopic(mediaId);
+      try {
+        // 1. Özel Firebase RTDB varsa kontrol et
+        if (cloudSyncConfig.customFirebaseUrl && cloudSyncConfig.customFirebaseUrl.startsWith('http')) {
+          const fbUrl = cloudSyncConfig.customFirebaseUrl.replace(/\/$/, '') + '/' + mediaTopic + '.json';
+          const fbRes = await fetch(fbUrl);
+          if (fbRes.ok) {
+            const fbData = await fbRes.json();
+            if (fbData && fbData.dataUrl) {
+              const r = await fetch(fbData.dataUrl);
+              const b = await r.blob();
+              await saveMediaBlobToIDB(mediaId, b);
+              return b;
+            }
+          }
+        }
+
+        // 2. ntfy medya kanalından kontrol et
+        const res = await fetch('https://ntfy.sh/' + mediaTopic + '/json?poll=1&since=all');
+        if (!res.ok) return null;
+        const text = await res.text();
+        const lines = text.trim().split('\n').filter(Boolean);
+        if (lines.length === 0) return null;
+
+        // En son yüklenen attachment (dosya) mesajını ara
+        const chunkGroups = {};
+        let latestTransferId = null;
+
+        for (let i = lines.length - 1; i >= 0; i--) {
+          try {
+            const msg = JSON.parse(lines[i]);
+            if (msg.event !== 'message') continue;
+            if (msg.attachment && msg.attachment.url) {
+              const attRes = await fetch(msg.attachment.url);
+              if (attRes.ok) {
+                const rawBlob = await attRes.blob();
+                const mime = expectedType === 'pdf' ? 'application/pdf' : (rawBlob.type || 'image/jpeg');
+                const finalBlob = new Blob([await rawBlob.arrayBuffer()], { type: mime });
+                await saveMediaBlobToIDB(mediaId, finalBlob);
+                return finalBlob;
+              }
+            }
+            if (msg.message && msg.message.startsWith('{')) {
+              const parsed = JSON.parse(msg.message);
+              if (parsed && parsed.t && typeof parsed.i === 'number' && parsed.n) {
+                if (!latestTransferId) latestTransferId = parsed.t;
+                if (parsed.t === latestTransferId) {
+                  if (!chunkGroups[parsed.t]) chunkGroups[parsed.t] = { n: parsed.n, parts: {} };
+                  chunkGroups[parsed.t].parts[parsed.i] = parsed.d || '';
+                }
+              }
+            }
+          } catch (e) {}
+        }
+
+        if (latestTransferId && chunkGroups[latestTransferId]) {
+          const grp = chunkGroups[latestTransferId];
+          let fullDataUrl = '';
+          let complete = true;
+          for (let idx = 0; idx < grp.n; idx++) {
+            if (typeof grp.parts[idx] !== 'string') { complete = false; break; }
+            fullDataUrl += grp.parts[idx];
+          }
+          if (complete && fullDataUrl.startsWith('data:')) {
+            const r = await fetch(fullDataUrl);
+            const b = await r.blob();
+            await saveMediaBlobToIDB(mediaId, b);
+            return b;
+          }
+        }
+      } catch (e) {
+        console.warn('Buluttan medya indirme uyarısı:', e);
+      }
+      return null;
+    }
+
+    async function pushAllLocalMediaBlobsToCloud() {
+      let pushedCount = 0;
+      for (const b of (store.brands || [])) {
+        for (const m of (b.models || [])) {
+          for (const med of (m.media || [])) {
+            if (med && med.id && !med.externalUrl && med.id !== 'med-p1') {
+              const localBlob = await getMediaBlobFromIDB(med.id);
+              if (localBlob) {
+                const ok = await pushMediaBlobToCloud(med.id, localBlob);
+                if (ok) pushedCount++;
+              }
+            }
+          }
+        }
+      }
+      return pushedCount;
+    }
+
     // SİLME İŞLEMİ
     function deleteMedia(mediaId) {
       const brand = store.brands.find(b => b.id === selectedBrandId);
       if (!brand) return;
       const model = brand.models.find(m => m.id === selectedModelId);
       if (!model) return;
+
+      if (!Array.isArray(cloudSyncConfig.deletedIds)) cloudSyncConfig.deletedIds = [];
+      if (!cloudSyncConfig.deletedIds.includes(mediaId)) cloudSyncConfig.deletedIds.push(mediaId);
+      saveCloudSyncConfig();
 
       model.media = model.media.filter(m => m.id !== mediaId);
       deleteMediaBlobFromIDB(mediaId);
@@ -25071,7 +25374,19 @@ function showToast(msg) {
           }
         } catch (e) {}
       }
-      if (!rawData || rawData.startsWith('idb://')) return null;
+      if (!rawData || rawData.startsWith('idb://')) {
+        // Bu cihazda yerel olarak yoksa uzaktaki cihazın yüklediği bulut medya kanalından otomatik indir!
+        const cloudBlob = await pullMediaBlobFromCloud(item.id, item.type);
+        if (cloudBlob) return cloudBlob;
+        // Eğer küçük önizleme (thumbData) varsa görsel için onu döndür
+        if (item.thumbData && item.thumbData.startsWith('data:')) {
+          try {
+            const r = await fetch(item.thumbData);
+            return await r.blob();
+          } catch (e) {}
+        }
+        return null;
+      }
 
       // Native fetch(dataUrl) kullanarak JS atob() ve split() kopyalaması olmadan doğrudan C++ seviyesinde Blob al
       try {
@@ -25489,6 +25804,11 @@ function showToast(msg) {
       modal.classList.remove('hidden');
       applyViewerZoom(1);
 
+      if (item.externalUrl) {
+        window.open(item.externalUrl, '_blank', 'noopener');
+        closeViewer();
+        return;
+      }
       if (item.type === 'pdf') {
         img.classList.add('hidden');
         img.src = '';
@@ -25504,6 +25824,7 @@ function showToast(msg) {
         if (item.data && !item.data.startsWith('idb://')) {
           img.src = item.data;
         } else {
+          if (item.thumbData) img.src = item.thumbData;
           const blob = await resolveMediaBlob(item);
           if (blob) {
             activeViewerObjectUrl = URL.createObjectURL(blob);
@@ -25598,7 +25919,7 @@ function showToast(msg) {
         const finalNote = customNote || `${type === 'pdf' ? 'Elektronik devre şeması (PDF)' : 'Denge & saha fotoğrafı'} yüklendi.`;
 
         if (type === 'pdf') {
-          // PDF dosyalarını base64 stringe çevirmeden doğrudan Binary Blob olarak IndexedDB'ye kaydet
+          // PDF dosyalarını base64 stringe çevirmeden doğrudan Binary Blob olarak IndexedDB'ye kaydet ve Buluta Gönder
           const blobCopy = new Blob([await file.arrayBuffer()], { type: 'application/pdf' });
           await saveMediaBlobToIDB(mediaId, blobCopy);
           model.media.unshift({
@@ -25610,14 +25931,32 @@ function showToast(msg) {
             date: new Date().toLocaleDateString('tr-TR'),
             notes: finalNote
           });
+          if (cloudSyncConfig.autoSync) {
+            pushMediaBlobToCloud(mediaId, blobCopy);
+          }
           loadedCount++;
         } else {
-          // Görseller için hem ikili IDB'ye kaydet hem kart önizlemesi için dataURL oluştur
+          // Görseller için hem ikili IDB'ye kaydet hem de uzaktaki cihazlarda anında önizleme için hafifletilmiş thumbData üret
           const dataUrl = await new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = (e) => resolve(e.target.result);
             reader.onerror = () => resolve('');
             reader.readAsDataURL(file);
+          });
+          const thumbDataUrl = await new Promise((resolve) => {
+            const tempImg = new Image();
+            tempImg.onload = () => {
+              const maxW = 480;
+              const scale = Math.min(1, maxW / (tempImg.naturalWidth || 480));
+              const c = document.createElement('canvas');
+              c.width = Math.max(1, Math.floor((tempImg.naturalWidth || 480) * scale));
+              c.height = Math.max(1, Math.floor((tempImg.naturalHeight || 360) * scale));
+              const ctx = c.getContext('2d');
+              ctx.drawImage(tempImg, 0, 0, c.width, c.height);
+              resolve(c.toDataURL('image/jpeg', 0.65));
+            };
+            tempImg.onerror = () => resolve('');
+            tempImg.src = dataUrl;
           });
           await saveMediaBlobToIDB(mediaId, file);
           model.media.unshift({
@@ -25626,9 +25965,13 @@ function showToast(msg) {
             category: category,
             type: type,
             data: dataUrl,
+            thumbData: thumbDataUrl,
             date: new Date().toLocaleDateString('tr-TR'),
             notes: finalNote
           });
+          if (cloudSyncConfig.autoSync) {
+            pushMediaBlobToCloud(mediaId, file);
+          }
           loadedCount++;
         }
       }
@@ -28032,16 +28375,112 @@ function showToast(msg) {
         showToast('Görsel boyutu ekrana sığacak şekilde sıfırlandı (%100)');
       });
 
-      // YEDEKLEME VE VERİ AKTARIMI
-      function exportData() {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(store, null, 2));
+      // UZAKTAN BULUT LİNKİ EKLEME (GOOGLE DRIVE / ICLOUD / WEB LİNKİ)
+      document.getElementById('btnToggleCloudLinkBox')?.addEventListener('click', () => {
+        const box = document.getElementById('cloudLinkInputBox');
+        if (box) box.classList.toggle('hidden');
+      });
+
+      document.getElementById('btnSaveCloudExternalLink')?.addEventListener('click', () => {
+        const brand = store.brands.find(b => b.id === selectedBrandId);
+        if (!brand) return;
+        const model = brand.models.find(m => m.id === selectedModelId);
+        if (!model) return;
+        if (!model.media) model.media = [];
+
+        const rawUrl = document.getElementById('inputCloudExternalUrl')?.value.trim() || '';
+        if (!rawUrl || !rawUrl.startsWith('http')) {
+          showToast('Lütfen geçerli bir bulut linki (https://...) yapıştırın!');
+          return;
+        }
+        const category = document.getElementById('selectCloudLinkCategory')?.value || 'electronic';
+        const customTitle = document.getElementById('inputUploadPhotoTitle')?.value.trim() || 'Bulut Şema / Katalog Linki';
+        const customNote = document.getElementById('inputUploadPhotoNote')?.value.trim() || 'Uzaktan erişilebilir bulut bağlantısı.';
+        const mediaId = 'med-link-' + Date.now();
+
+        model.media.unshift({
+          id: mediaId,
+          title: customTitle,
+          category: category,
+          type: category === 'electronic' ? 'pdf' : 'image',
+          data: rawUrl,
+          externalUrl: rawUrl,
+          date: new Date().toLocaleDateString('tr-TR'),
+          notes: customNote
+        });
+
+        document.getElementById('inputCloudExternalUrl').value = '';
+        document.getElementById('inputUploadPhotoTitle').value = '';
+        document.getElementById('inputUploadPhotoNote').value = '';
+        document.getElementById('cloudLinkInputBox')?.classList.add('hidden');
+        saveStore();
+        renderModelDetail();
+        showToast('🔗 Bulut linki eklendi ve uzaktaki cihazlarla eşitlendi!');
+      });
+
+      // TÜM PDF VE GÖRSELLERİ İÇEREN TAM PAKET HAZIRLAMA VE GERİ YÜKLEME MOTORU
+      async function buildFullPortableBackupObject() {
+        const exportCopy = JSON.parse(JSON.stringify(store));
+        const idbBlobs = {};
+        for (const b of (exportCopy.brands || [])) {
+          for (const m of (b.models || [])) {
+            for (const med of (m.media || [])) {
+              if (med && med.id && !med.externalUrl) {
+                const blob = await getMediaBlobFromIDB(med.id);
+                if (blob) {
+                  const dataUrl = await blobToDataUrl(blob);
+                  if (dataUrl) idbBlobs[med.id] = dataUrl;
+                }
+              }
+            }
+          }
+        }
+        exportCopy._portableMediaBlobs = idbBlobs;
+        return exportCopy;
+      }
+
+      async function restoreFullPortableBackupObject(imported) {
+        if (!imported || !imported.brands) return false;
+        const blobMap = imported._portableMediaBlobs || {};
+        delete imported._portableMediaBlobs;
+        for (const mediaId of Object.keys(blobMap)) {
+          try {
+            const dataUrl = blobMap[mediaId];
+            if (dataUrl && dataUrl.startsWith('data:')) {
+              const r = await fetch(dataUrl);
+              const b = await r.blob();
+              await saveMediaBlobToIDB(mediaId, b);
+            }
+          } catch (e) {}
+        }
+        store = imported;
+        mergeWithDefaultLibraries();
+        saveStore();
+        renderBrands();
+        if (!document.getElementById('viewModelList').classList.contains('hidden')) renderModels();
+        if (!document.getElementById('viewModelDetail').classList.contains('hidden')) renderModelDetail();
+        if (!document.getElementById('viewServiceForms').classList.contains('hidden')) renderServiceForms();
+        if (!document.getElementById('viewFleet').classList.contains('hidden')) renderFleetView();
+        return true;
+      }
+
+      // YEDEKLEME VE VERİ AKTARIMI (TÜM PDF & GÖRSELLER DAHİL)
+      async function exportData() {
+        showToast('📦 Tüm PDF ve görseller yedek paketine ekleniyor...');
+        const fullBackup = await buildFullPortableBackupObject();
+        const jsonStr = JSON.stringify(fullBackup, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
         const downloadAnchor = document.createElement('a');
-        downloadAnchor.setAttribute("href", dataStr);
-        downloadAnchor.setAttribute("download", `Inanir_Kule_Vinc_Yedek_${new Date().toISOString().slice(0, 10)}.json`);
+        downloadAnchor.setAttribute("href", url);
+        downloadAnchor.setAttribute("download", `Inanir_Kule_Vinc_Tam_Yedek_${new Date().toISOString().slice(0, 10)}.json`);
         document.body.appendChild(downloadAnchor);
         downloadAnchor.click();
-        downloadAnchor.remove();
-        showToast('Yedek JSON dosyası indirildi');
+        setTimeout(() => {
+          downloadAnchor.remove();
+          URL.revokeObjectURL(url);
+        }, 3000);
+        showToast('✓ Tüm PDF ve görselleri içeren tam yedek indirildi!');
       }
 
       // BULUT EŞİTLEME MODALI VE BUTONLARI
@@ -28079,19 +28518,26 @@ function showToast(msg) {
       });
 
       document.getElementById('btnPullCloudNow')?.addEventListener('click', () => pullStoreFromCloud(true));
-      document.getElementById('btnPushCloudNow')?.addEventListener('click', () => pushStoreToCloud(true));
+      document.getElementById('btnPushCloudNow')?.addEventListener('click', async () => {
+        showToast('☁️ Kayıtlar ve eklenen PDF/görseller buluta gönderiliyor...');
+        await pushStoreToCloud(true);
+        await pushAllLocalMediaBlobsToCloud();
+        showToast('☁️ Tüm makineler, PDF şemalar ve görseller buluta eşitlendi!');
+      });
 
       document.getElementById('btnShareDatabaseFile')?.addEventListener('click', async () => {
         try {
-          const jsonStr = JSON.stringify(store, null, 2);
+          showToast('📦 Tüm PDF ve görseller paylaşım paketine hazırlanıyor...');
+          const fullBackup = await buildFullPortableBackupObject();
+          const jsonStr = JSON.stringify(fullBackup);
           const blob = new Blob([jsonStr], { type: 'application/json' });
-          const fileName = `Inanir_Kule_Vinc_Yedek_${new Date().toISOString().slice(0, 10)}.json`;
+          const fileName = `Inanir_Kule_Vinc_Tam_Yedek_${new Date().toISOString().slice(0, 10)}.json`;
           const file = new File([blob], fileName, { type: 'application/json' });
           if (navigator.canShare && navigator.canShare({ files: [file] })) {
             await navigator.share({
               files: [file],
-              title: 'İnanır Kule Vinç Veritabanı Yedeği',
-              text: 'Ana Ekran, Safari ve diğer cihazlar için tam arşiv yedeği.'
+              title: 'İnanır Kule Vinç Tam Arşiv Yedeği (PDF & Görseller Dahil)',
+              text: 'Uzaktaki cihazlar için tüm makineler, PDF şemalar ve görselleri içeren tam yedek paketi.'
             });
             showToast('✓ Paylaşım ekranı açıldı!');
             return;
@@ -28106,18 +28552,12 @@ function showToast(msg) {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = function(event) {
+        reader.onload = async function(event) {
           try {
             const imported = JSON.parse(event.target.result);
-            if (imported && imported.brands) {
-              store = imported;
-              mergeWithDefaultLibraries();
-              saveStore();
-              renderBrands();
-              if (!document.getElementById('viewServiceForms').classList.contains('hidden')) renderServiceForms();
-              if (!document.getElementById('viewFleet').classList.contains('hidden')) renderFleetView();
+            if (await restoreFullPortableBackupObject(imported)) {
               modalCloudSync.classList.add('hidden');
-              showToast('✓ Tüm yedek başarıyla yüklendi ve bulutla eşitlendi!');
+              showToast('✓ Tüm makineler, PDF şemalar ve görseller başarıyla yüklendi!');
             }
           } catch (err) {
             showToast('Geçersiz yedek dosyası!');
@@ -28133,14 +28573,11 @@ function showToast(msg) {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = function(event) {
+        reader.onload = async function(event) {
           try {
             const imported = JSON.parse(event.target.result);
-            if (imported && imported.brands) {
-              store = imported;
-              saveStore();
-              renderBrands();
-              showToast('Yedek başarıyla yüklendi!');
+            if (await restoreFullPortableBackupObject(imported)) {
+              showToast('✓ Tüm makineler, PDF şemalar ve görseller başarıyla yüklendi!');
             }
           } catch (err) {
             showToast('Geçersiz yedek dosyası!');
