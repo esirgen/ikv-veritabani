@@ -24270,7 +24270,8 @@
       const isTransient = statusText && (statusText.includes('Kontrol') || statusText.includes('Gönderiliyor'));
       if (isTransient) {
         cloudStatusWatchdog = setTimeout(() => {
-          cloudSyncConfig.lastSyncTimestamp = Date.now();
+          checkAndFulfillRemoteMediaRequests();
+        cloudSyncConfig.lastSyncTimestamp = Date.now();
           saveCloudSyncConfig();
           updateCloudSyncUIStatus('Bağlı & Eşitlendi', false);
         }, 5000);
@@ -25474,66 +25475,155 @@ function showToast(msg) {
       });
     }
 
-    async function pushMediaBlobToCloud(mediaId, blobOrFile, itemRef = null) {
+    function uint8SliceToBase64(uint8Arr) {
+      let binary = '';
+      const step = 32768;
+      for (let i = 0; i < uint8Arr.length; i += step) {
+        const sub = uint8Arr.subarray(i, Math.min(i + step, uint8Arr.length));
+        binary += String.fromCharCode.apply(null, sub);
+      }
+      return btoa(binary);
+    }
+
+    function base64ToUint8Slice(b64Str) {
+      const clean = String(b64Str || '').replace(/^data:[^;]+;base64,/, '').trim();
+      const bin = atob(clean);
+      const len = bin.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = bin.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    function dataUrlToBlobDirect(dataUrl, fallbackMime = 'application/pdf') {
+      try {
+        const commaIdx = dataUrl.indexOf(',');
+        if (commaIdx === -1) return null;
+        const meta = dataUrl.slice(0, commaIdx);
+        const body = dataUrl.slice(commaIdx + 1);
+        const mimeMatch = meta.match(/data:([^;]+)/);
+        const mime = mimeMatch ? mimeMatch[1] : fallbackMime;
+        if (meta.includes(';base64')) {
+          const bytes = base64ToUint8Slice(body);
+          return new Blob([bytes], { type: mime });
+        } else {
+          return new Blob([decodeURIComponent(body)], { type: mime });
+        }
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function updateViewerTransferStatus(text) {
+      const statusEl = document.getElementById('txtPdfCloudSyncProgress');
+      if (statusEl) statusEl.innerText = text;
+    }
+
+    async function pushMediaBlobToCloud(mediaId, blobOrFile, itemRef = null, onProgress = null) {
       if (!mediaId || !blobOrFile) return false;
       const mediaTopic = getSanitizedMediaTopic(mediaId);
+      let uploadedToFirebase = false;
       let uploadedAny = false;
+      const mime = blobOrFile.type || (itemRef && itemRef.type === 'pdf' ? 'application/pdf' : 'image/jpeg');
+
       try {
-        // 1. Özel Firebase RTDB tanımlıysa oraya da yaz
-        if (cloudSyncConfig.customFirebaseUrl && cloudSyncConfig.customFirebaseUrl.startsWith('http')) {
-          const dataUrl = await blobToDataUrl(blobOrFile);
-          if (dataUrl) {
-            const fbUrl = cloudSyncConfig.customFirebaseUrl.replace(/\/$/, '') + '/' + mediaTopic + '.json';
-            const fbRes = await fetch(fbUrl, {
-              method: 'PUT',
-              body: JSON.stringify({ mediaId, mime: blobOrFile.type || 'application/pdf', dataUrl, ts: Date.now() })
-            });
-            if (fbRes.ok) uploadedAny = true;
+        const arrayBuf = await blobOrFile.arrayBuffer();
+        const totalBytes = arrayBuf.byteLength;
+        // 768 KB (786,432 bayt - 3'ün tam katı) dilimler halinde Firebase RTDB'ye parçalı yükleme (10 MB tekil string sınırını %100 aşar)
+        const CHUNK_BYTE_SIZE = 786432;
+        const totalChunks = Math.max(1, Math.ceil(totalBytes / CHUNK_BYTE_SIZE));
+
+        const fbBase = sanitizeFirebaseBaseUrl(cloudSyncConfig.customFirebaseUrl || DEFAULT_FIREBASE_URL);
+        if (fbBase && fbBase.startsWith('http')) {
+          try {
+            let allChunksOk = true;
+            for (let i = 0; i < totalChunks; i++) {
+              const start = i * CHUNK_BYTE_SIZE;
+              const end = Math.min(start + CHUNK_BYTE_SIZE, totalBytes);
+              const sliceBytes = new Uint8Array(arrayBuf, start, end - start);
+              const b64Chunk = uint8SliceToBase64(sliceBytes);
+              if (onProgress) {
+                const pct = Math.round(((i + 1) / totalChunks) * 100);
+                onProgress(`☁️ PDF Buluta Yükleniyor: %${pct} (${i + 1}/${totalChunks} Parça)`);
+              }
+              const chunkUrl = `${fbBase}/${mediaTopic}/chunks/${i}.json`;
+              const cRes = await fetchWithTimeout(chunkUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(b64Chunk)
+              }, 20000);
+              if (!cRes.ok) {
+                allChunksOk = false;
+                break;
+              }
+            }
+            if (allChunksOk) {
+              const metaObj = {
+                mediaId: mediaId,
+                mime: mime,
+                size: totalBytes,
+                totalChunks: totalChunks,
+                chunkVersion: 2,
+                ts: Date.now()
+              };
+              const metaUrl = `${fbBase}/${mediaTopic}/meta.json`;
+              const mRes = await fetchWithTimeout(metaUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(metaObj)
+              }, 12000);
+              if (mRes.ok) {
+                uploadedToFirebase = true;
+                uploadedAny = true;
+                const fbMetaMarker = `fb://${mediaTopic}`;
+                if (itemRef) {
+                  itemRef.cloudBlobUrl = fbMetaMarker;
+                } else {
+                  (store.brands || []).forEach(b => (b.models || []).forEach(m => (m.media || []).forEach(med => {
+                    if (med.id === mediaId) med.cloudBlobUrl = fbMetaMarker;
+                  })));
+                }
+                // Bekleyen talep varsa temizle
+                const roomTopic = getSanitizedRoomTopic();
+                fetch(`${fbBase}/${roomTopic}_req/${mediaId}.json`, { method: 'DELETE' }).catch(() => {});
+              }
+            }
+          } catch (fbErr) {
+            console.warn('Firebase parçalı PDF yükleme uyarısı:', fbErr);
           }
         }
 
-        // 2. Doğrudan bulut dosya sunucusuna (tmpfiles.org API) multipart POST yüklemesi
-        try {
-          const fd = new FormData();
-          const ext = (blobOrFile.type && blobOrFile.type.includes('pdf')) ? '.pdf' : '.jpg';
-          fd.append('file', blobOrFile, mediaId + ext);
-          const tfRes = await fetch('https://tmpfiles.org/api/v1/upload', {
-            method: 'POST',
-            body: fd
-          });
-          if (tfRes.ok) {
-            const tfJson = await tfRes.json();
-            const rawUrl = tfJson && tfJson.data && tfJson.data.url ? tfJson.data.url : '';
-            if (rawUrl) {
-              const directDlUrl = rawUrl.replace('http://tmpfiles.org/', 'https://tmpfiles.org/dl/').replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
-              if (itemRef) {
-                itemRef.cloudBlobUrl = directDlUrl;
-              } else {
-                (store.brands || []).forEach(b => (b.models || []).forEach(m => (m.media || []).forEach(med => {
-                  if (med.id === mediaId) med.cloudBlobUrl = directDlUrl;
-                })));
+        // 2. Yedek olarak tmpfiles.org üzerinden doğrudan link oluştur (küçük/orta boy dosyalar için ek hız)
+        if (!uploadedToFirebase) {
+          try {
+            const fd = new FormData();
+            const ext = mime.includes('pdf') ? '.pdf' : '.jpg';
+            fd.append('file', new Blob([arrayBuf], { type: mime }), mediaId + ext);
+            const tfRes = await fetchWithTimeout('https://tmpfiles.org/api/v1/upload', {
+              method: 'POST',
+              body: fd
+            }, 15000);
+            if (tfRes.ok) {
+              const tfJson = await tfRes.json();
+              const rawUrl = tfJson && tfJson.data && tfJson.data.url ? tfJson.data.url : '';
+              if (rawUrl) {
+                const directDlUrl = rawUrl.replace('http://tmpfiles.org/', 'https://tmpfiles.org/dl/').replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+                if (itemRef) {
+                  itemRef.cloudBlobUrl = directDlUrl;
+                } else {
+                  (store.brands || []).forEach(b => (b.models || []).forEach(m => (m.media || []).forEach(med => {
+                    if (med.id === mediaId) med.cloudBlobUrl = directDlUrl;
+                  })));
+                }
+                uploadedAny = true;
               }
-              await fetch('https://ntfy.sh/' + mediaTopic, {
-                method: 'POST',
-                body: JSON.stringify({ cloudBlobUrl: directDlUrl, mediaId, ts: Date.now() })
-              });
-              uploadedAny = true;
             }
-          }
-        } catch (tfErr) {}
+          } catch (tfErr) {}
+        }
 
-        // 3. CORS-Simple POST ile ntfy medya kanalına doğrudan ikili/dataUrl gönderim (4KB üstünü otomatik attachment yapar)
-        try {
-          const plainBlob = new Blob([await blobOrFile.arrayBuffer()], { type: 'text/plain' });
-          const res = await fetch('https://ntfy.sh/' + mediaTopic, {
-            method: 'POST',
-            body: plainBlob
-          });
-          if (res.ok) uploadedAny = true;
-        } catch (postErr) {}
-
-        if (uploadedAny) {
-          try { localStorage.setItem('ikv_cloud_pushed_' + mediaId, '1'); } catch (e) {}
+        if (uploadedToFirebase) {
+          try { localStorage.setItem('ikv_fb_pushed_v2_' + mediaId, '1'); } catch (e) {}
         }
       } catch (e) {
         console.warn('Bulut medya yükleme uyarısı:', e);
@@ -25544,20 +25634,106 @@ function showToast(msg) {
     async function requestMediaFromRemoteDevice(mediaId) {
       if (!mediaId) return;
       const roomTopic = getSanitizedRoomTopic();
+      const reqPayload = JSON.stringify({ reqMediaId: mediaId, deviceId: cloudSyncConfig.deviceId, ts: Date.now() });
+      const fbBase = sanitizeFirebaseBaseUrl(cloudSyncConfig.customFirebaseUrl || DEFAULT_FIREBASE_URL);
+      if (fbBase && fbBase.startsWith('http')) {
+        try {
+          await fetchWithTimeout(`${fbBase}/${roomTopic}_req/${mediaId}.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: reqPayload
+          }, 5000);
+        } catch (e) {}
+      }
       try {
-        await fetch('https://ntfy.sh/' + roomTopic, {
+        await fetchWithTimeout('https://ntfy.sh/' + roomTopic, {
           method: 'POST',
-          body: JSON.stringify({ reqMediaId: mediaId, deviceId: cloudSyncConfig.deviceId, ts: Date.now() })
-        });
+          body: reqPayload
+        }, 4500);
       } catch (e) {}
     }
 
-    async function pullMediaBlobFromCloud(mediaId, expectedType = 'pdf', itemRef = null) {
+    async function checkAndFulfillRemoteMediaRequests() {
+      const fbBase = sanitizeFirebaseBaseUrl(cloudSyncConfig.customFirebaseUrl || DEFAULT_FIREBASE_URL);
+      if (!fbBase || !fbBase.startsWith('http')) return;
+      const roomTopic = getSanitizedRoomTopic();
+      try {
+        const res = await fetchWithTimeout(`${fbBase}/${roomTopic}_req.json`, {}, 5000);
+        if (!res.ok) return;
+        const reqMap = await res.json();
+        if (!reqMap || typeof reqMap !== 'object') return;
+        for (const mediaId of Object.keys(reqMap)) {
+          const reqObj = reqMap[mediaId];
+          if (!reqObj || reqObj.deviceId === cloudSyncConfig.deviceId) continue;
+          const localBlob = await getMediaBlobFromIDB(mediaId);
+          if (localBlob) {
+            let foundItem = null;
+            (store.brands || []).forEach(b => (b.models || []).forEach(m => (m.media || []).forEach(med => {
+              if (med.id === mediaId) foundItem = med;
+            })));
+            await pushMediaBlobToCloud(mediaId, localBlob, foundItem);
+            await pushStoreToCloud(false);
+          }
+        }
+      } catch (e) {}
+    }
+
+    async function pullMediaBlobFromCloud(mediaId, expectedType = 'pdf', itemRef = null, onProgress = null) {
       if (!mediaId) return null;
       const mediaTopic = getSanitizedMediaTopic(mediaId);
       const mime = expectedType === 'pdf' ? 'application/pdf' : 'image/jpeg';
+      const fbBase = sanitizeFirebaseBaseUrl(cloudSyncConfig.customFirebaseUrl || DEFAULT_FIREBASE_URL);
+
       try {
-        // 0. Öğenin üzerinde veya store içinde cloudBlobUrl varsa doğrudan çek
+        // 1. Önce Firebase RTDB üzerindeki parçalı (v2 chunks) veya tekil (v1 dataUrl) kaydı kontrol et
+        if (fbBase && fbBase.startsWith('http')) {
+          try {
+            const metaRes = await fetchWithTimeout(`${fbBase}/${mediaTopic}/meta.json`, {}, 6000);
+            if (metaRes.ok) {
+              const meta = await metaRes.json();
+              if (meta && meta.totalChunks && meta.totalChunks > 0) {
+                const uint8Parts = [];
+                let allOk = true;
+                for (let i = 0; i < meta.totalChunks; i++) {
+                  if (onProgress) {
+                    const pct = Math.round(((i + 1) / meta.totalChunks) * 100);
+                    onProgress(`☁️ PDF İndiriliyor: %${pct} (${i + 1}/${meta.totalChunks} Parça)`);
+                  }
+                  const cRes = await fetchWithTimeout(`${fbBase}/${mediaTopic}/chunks/${i}.json`, {}, 15000);
+                  if (!cRes.ok) { allOk = false; break; }
+                  const b64Str = await cRes.json();
+                  if (!b64Str || typeof b64Str !== 'string') { allOk = false; break; }
+                  uint8Parts.push(base64ToUint8Slice(b64Str));
+                }
+                if (allOk && uint8Parts.length === meta.totalChunks) {
+                  const finalBlob = new Blob(uint8Parts, { type: meta.mime || mime });
+                  if (finalBlob.size > 100) {
+                    await saveMediaBlobToIDB(mediaId, finalBlob);
+                    try { localStorage.setItem('ikv_fb_pushed_v2_' + mediaId, '1'); } catch (e) {}
+                    return finalBlob;
+                  }
+                }
+              }
+            }
+          } catch (e) {}
+
+          // Eski tekil format (dataUrl) kontrolü (fetch(dataUrl) KULLANMADAN doğrudan Uint8Array dönüşümü)
+          try {
+            const fbRes = await fetchWithTimeout(`${fbBase}/${mediaTopic}.json`, {}, 8000);
+            if (fbRes.ok) {
+              const fbData = await fbRes.json();
+              if (fbData && fbData.dataUrl) {
+                const b = dataUrlToBlobDirect(fbData.dataUrl, fbData.mime || mime);
+                if (b && b.size > 100) {
+                  await saveMediaBlobToIDB(mediaId, b);
+                  return b;
+                }
+              }
+            }
+          } catch (e) {}
+        }
+
+        // 2. Öğenin üzerinde harici http cloudBlobUrl varsa kontrol et
         let directUrl = itemRef && itemRef.cloudBlobUrl ? itemRef.cloudBlobUrl : null;
         if (!directUrl) {
           (store.brands || []).forEach(b => (b.models || []).forEach(m => (m.media || []).forEach(med => {
@@ -25566,7 +25742,7 @@ function showToast(msg) {
         }
         if (directUrl && directUrl.startsWith('http')) {
           try {
-            const dRes = await fetch(directUrl);
+            const dRes = await fetchWithTimeout(directUrl, {}, 12000);
             if (dRes.ok) {
               const rawB = await dRes.blob();
               if (rawB.size > 100) {
@@ -25578,51 +25754,17 @@ function showToast(msg) {
           } catch (e) {}
         }
 
-        // 1. Özel Firebase RTDB varsa kontrol et
-        if (cloudSyncConfig.customFirebaseUrl && cloudSyncConfig.customFirebaseUrl.startsWith('http')) {
-          const fbUrl = cloudSyncConfig.customFirebaseUrl.replace(/\/$/, '') + '/' + mediaTopic + '.json';
-          const fbRes = await fetch(fbUrl);
-          if (fbRes.ok) {
-            const fbData = await fbRes.json();
-            if (fbData && fbData.dataUrl) {
-              const r = await fetch(fbData.dataUrl);
-              const b = await r.blob();
-              await saveMediaBlobToIDB(mediaId, b);
-              return b;
-            }
-          }
-        }
-
-        // 2. ntfy medya kanalından kontrol et
-        const res = await fetch('https://ntfy.sh/' + mediaTopic + '/json?poll=1&since=all');
+        // 3. ntfy medya kanalından yedek kontrol
+        const res = await fetchWithTimeout('https://ntfy.sh/' + mediaTopic + '/json?poll=1&since=all', {}, 6000);
         if (!res.ok) return null;
         const text = await res.text();
         const lines = text.trim().split('\n').filter(Boolean);
-        if (lines.length === 0) return null;
-
-        const chunkGroups = {};
-        let latestTransferId = null;
-
         for (let i = lines.length - 1; i >= 0; i--) {
           try {
             const msg = JSON.parse(lines[i]);
             if (msg.event !== 'message') continue;
-            if (msg.message && msg.message.includes('"cloudBlobUrl"')) {
-              const parsedUrlObj = JSON.parse(msg.message);
-              if (parsedUrlObj && parsedUrlObj.cloudBlobUrl) {
-                const cRes = await fetch(parsedUrlObj.cloudBlobUrl);
-                if (cRes.ok) {
-                  const rawBlob = await cRes.blob();
-                  if (rawBlob.size > 100) {
-                    const finalBlob = new Blob([await rawBlob.arrayBuffer()], { type: mime });
-                    await saveMediaBlobToIDB(mediaId, finalBlob);
-                    return finalBlob;
-                  }
-                }
-              }
-            }
             if (msg.attachment && msg.attachment.url) {
-              const attRes = await fetch(msg.attachment.url);
+              const attRes = await fetchWithTimeout(msg.attachment.url, {}, 10000);
               if (attRes.ok) {
                 const buf = await attRes.arrayBuffer();
                 if (buf.byteLength > 100) {
@@ -25630,10 +25772,11 @@ function showToast(msg) {
                   const headerStr = String.fromCharCode(...firstBytes);
                   if (headerStr.startsWith('data:')) {
                     const fullText = new TextDecoder().decode(buf);
-                    const r = await fetch(fullText);
-                    const finalBlob = await r.blob();
-                    await saveMediaBlobToIDB(mediaId, finalBlob);
-                    return finalBlob;
+                    const finalBlob = dataUrlToBlobDirect(fullText, mime);
+                    if (finalBlob) {
+                      await saveMediaBlobToIDB(mediaId, finalBlob);
+                      return finalBlob;
+                    }
                   } else {
                     const finalBlob = new Blob([buf], { type: mime });
                     await saveMediaBlobToIDB(mediaId, finalBlob);
@@ -25643,38 +25786,13 @@ function showToast(msg) {
               }
             }
             if (msg.message && msg.message.startsWith('data:')) {
-              const r = await fetch(msg.message);
-              const finalBlob = await r.blob();
-              await saveMediaBlobToIDB(mediaId, finalBlob);
-              return finalBlob;
-            }
-            if (msg.message && msg.message.startsWith('{')) {
-              const parsed = JSON.parse(msg.message);
-              if (parsed && parsed.t && typeof parsed.i === 'number' && parsed.n) {
-                if (!latestTransferId) latestTransferId = parsed.t;
-                if (parsed.t === latestTransferId) {
-                  if (!chunkGroups[parsed.t]) chunkGroups[parsed.t] = { n: parsed.n, parts: {} };
-                  chunkGroups[parsed.t].parts[parsed.i] = parsed.d || '';
-                }
+              const finalBlob = dataUrlToBlobDirect(msg.message, mime);
+              if (finalBlob) {
+                await saveMediaBlobToIDB(mediaId, finalBlob);
+                return finalBlob;
               }
             }
           } catch (e) {}
-        }
-
-        if (latestTransferId && chunkGroups[latestTransferId]) {
-          const grp = chunkGroups[latestTransferId];
-          let fullDataUrl = '';
-          let complete = true;
-          for (let idx = 0; idx < grp.n; idx++) {
-            if (typeof grp.parts[idx] !== 'string') { complete = false; break; }
-            fullDataUrl += grp.parts[idx];
-          }
-          if (complete && fullDataUrl.startsWith('data:')) {
-            const r = await fetch(fullDataUrl);
-            const b = await r.blob();
-            await saveMediaBlobToIDB(mediaId, b);
-            return b;
-          }
         }
       } catch (e) {
         console.warn('Buluttan medya indirme uyarısı:', e);
@@ -25689,7 +25807,7 @@ function showToast(msg) {
         for (const m of (b.models || [])) {
           for (const med of (m.media || [])) {
             if (med && med.id && !med.externalUrl && med.id !== 'med-p1') {
-              if (onlyUnpushed && med.cloudBlobUrl && localStorage.getItem('ikv_cloud_pushed_' + med.id) === '1') {
+              if (onlyUnpushed && localStorage.getItem('ikv_fb_pushed_v2_' + med.id) === '1') {
                 continue;
               }
               const localBlob = await getMediaBlobFromIDB(med.id);
@@ -25705,13 +25823,14 @@ function showToast(msg) {
           }
         }
       }
-      if (anyUrlUpdated) {
-        saveStore(false);
+      if (anyUrlUpdated || pushedCount > 0) {
+        saveStore(true);
       }
       return pushedCount;
     }
 
     async function autoPrefetchRemoteMediaBlobs() {
+      await checkAndFulfillRemoteMediaRequests();
       for (const b of (store.brands || [])) {
         for (const m of (b.models || [])) {
           for (const med of (m.media || [])) {
@@ -25724,6 +25843,11 @@ function showToast(msg) {
                   } else if (!document.getElementById('viewModelDetail').classList.contains('hidden')) {
                     renderModelDetail();
                   }
+                });
+              } else if (localStorage.getItem('ikv_fb_pushed_v2_' + med.id) !== '1') {
+                // Bu cihazda yerel olarak var ama henüz yeni Firebase parçalı sisteme yüklenmemişse arka planda yükle!
+                pushMediaBlobToCloud(med.id, existing, med).then(ok => {
+                  if (ok) pushStoreToCloud(false);
                 });
               }
             }
@@ -25792,26 +25916,23 @@ function showToast(msg) {
       }
       if (!rawData || rawData.startsWith('idb://')) {
         // Bu cihazda yerel olarak yoksa uzaktaki cihazın yüklediği bulut medya kanalından otomatik indir!
-        const cloudBlob = await pullMediaBlobFromCloud(item.id, item.type, item);
+        const cloudBlob = await pullMediaBlobFromCloud(item.id, item.type, item, updateViewerTransferStatus);
         if (cloudBlob) return cloudBlob;
         // Eğer küçük önizleme (thumbData) varsa görsel için onu döndür
         if (item.thumbData && item.thumbData.startsWith('data:')) {
-          try {
-            const r = await fetch(item.thumbData);
-            return await r.blob();
-          } catch (e) {}
+          const tb = dataUrlToBlobDirect(item.thumbData, 'image/jpeg');
+          if (tb) return tb;
         }
         return null;
       }
 
-      // Native fetch(dataUrl) kullanarak JS atob() ve split() kopyalaması olmadan doğrudan C++ seviyesinde Blob al
-      try {
-        const res = await fetch(rawData);
-        const blob = await res.blob();
-        // Gelecekteki açılışlar için ikili IDB'ye kaydet
-        saveMediaBlobToIDB(item.id, blob);
-        return blob;
-      } catch (e) {
+      // iOS Safari WebKit büyük dataUrl'lerde fetch() hatası verdiği için doğrudan Uint8Array -> Blob dönüşümü kullan
+      const directBlob = dataUrlToBlobDirect(rawData, item.type === 'pdf' ? 'application/pdf' : 'image/jpeg');
+      if (directBlob && directBlob.size > 0) {
+        saveMediaBlobToIDB(item.id, directBlob);
+        return directBlob;
+      }
+      {
         try {
           const commaIdx = rawData.indexOf(',');
           if (commaIdx === -1) return null;
@@ -26188,24 +26309,36 @@ function showToast(msg) {
           iframe.src = activeViewerObjectUrl;
           return;
         }
-        // Dosya gövdesi henüz inmemişse hiçbir manuel buton göstermeden arka planda otomatik olarak buluttan/diğer cihazdan çek ve ekrana çiz!
+        // Dosya gövdesi henüz inmemişse arka planda otomatik olarak Firebase'den/diğer cihazdan çek ve canlı yüzde göster!
         iframe.classList.add('hidden');
         pdfPagesContainer.classList.remove('hidden');
         pdfPagesContainer.innerHTML = `
-          <div class="py-16 text-center space-y-3 my-auto">
+          <div class="py-14 px-4 text-center space-y-3.5 my-auto max-w-md mx-auto">
             <div class="inline-block w-9 h-9 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
             <p class="text-xs sm:text-sm font-bold text-amber-400">☁️ "${item.title || 'PDF Şema'}" buluttan otomatik eşitleniyor...</p>
-            <p class="text-[11px] text-slate-400">Lütfen birkaç saniye bekleyin, tamamlandığında otomatik açılacaktır.</p>
+            <p id="txtPdfCloudSyncProgress" class="text-xs font-mono font-bold text-emerald-400 bg-slate-900/90 border border-slate-800 rounded-xl py-2 px-3">
+              Firebase sunucusundan PDF parçaları kontrol ediliyor...
+            </p>
+            <p class="text-[11px] text-slate-400 leading-relaxed">
+              Lütfen birkaç saniye bekleyin, tamamlandığında otomatik açılacaktır.<br>
+              <span class="text-slate-500 text-[10px]">(Not: PDF'i ilk eklediğiniz cihazda uygulama açıksa PDF otomatik olarak Firebase'e gönderilir.)</span>
+            </p>
           </div>
         `;
         await requestMediaFromRemoteDevice(item.id);
+        const immediatePulled = await pullMediaBlobFromCloud(item.id, item.type, item, updateViewerTransferStatus);
+        if (immediatePulled && sessionId === activePdfRenderSessionId) {
+          renderFullPdfInViewer(item);
+          return;
+        }
         await pullStoreFromCloud(false);
-        for (let attempt = 1; attempt <= 20; attempt++) {
+        for (let attempt = 1; attempt <= 25; attempt++) {
           if (sessionId !== activePdfRenderSessionId) return;
-          await new Promise(r => setTimeout(r, 1500));
+          updateViewerTransferStatus(`Diğer cihazdan PDF aktarımı bekleniyor... (Deneme ${attempt}/25)`);
+          await new Promise(r => setTimeout(r, 1600));
           if (sessionId !== activePdfRenderSessionId) return;
           await pullStoreFromCloud(false);
-          const pulled = await pullMediaBlobFromCloud(item.id, item.type, item);
+          const pulled = await pullMediaBlobFromCloud(item.id, item.type, item, updateViewerTransferStatus);
           if (pulled) {
             renderFullPdfInViewer(item);
             return;
@@ -26377,8 +26510,9 @@ function showToast(msg) {
           model.media.unshift(newPdfItem);
           renderModelDetail();
           if (cloudSyncConfig.autoSync) {
-            showToast('☁️ PDF diğer cihazlarla otomatik eşitleniyor...');
-            await pushMediaBlobToCloud(mediaId, blobCopy, newPdfItem);
+            showToast('☁️ PDF Firebase bulutuna parçalı yükleniyor...');
+            const upOk = await pushMediaBlobToCloud(mediaId, blobCopy, newPdfItem, (msg) => showToast(msg));
+            if (upOk) showToast('✓ PDF Firebase bulutuna yüklendi, tüm cihazlardan açılabilir!');
           }
           loadedCount++;
         } else {
