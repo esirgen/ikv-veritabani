@@ -1753,19 +1753,28 @@
           </div>
         </div>
 
-        <!-- 3. Gelişmiş: Özel Bulut Sunucu / Firebase URL (İsteğe Bağlı) -->
-        <details class="bg-slate-950 border border-slate-800 rounded-xl p-3">
-          <summary class="font-bold text-slate-300 cursor-pointer flex items-center justify-between">
-            <span>⚙️ Gelişmiş: Özel Firebase / REST Veritabanı Bağlantısı (Opsiyonel)</span>
-            <span class="text-[10px] text-slate-500">İsteğe Bağlı</span>
-          </summary>
-          <div class="mt-2.5 space-y-2 pt-2 border-t border-slate-800">
-            <p class="text-[10px] text-slate-400">
-              Kendi özel Firebase Realtime Database adresiniz varsa buraya yapıştırabilirsiniz (boş bırakırsanız varsayılan ücretsiz anlık bulut servisi kullanılır):
-            </p>
-            <input type="url" id="inputCustomFirebaseUrl" placeholder="https://projeniz-default-rtdb.firebaseio.com" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-500">
+        <!-- 3. Google Firebase Realtime Database Doğrudan Bağlantı Kartı -->
+        <div class="bg-slate-950 border-2 border-amber-500/40 rounded-xl p-3.5 space-y-2.5 shadow-md">
+          <div class="flex items-center justify-between">
+            <h4 class="font-black text-amber-400 text-xs flex items-center gap-1.5">
+              <span>🔥</span> Google Firebase Realtime Database Bağlantısı
+            </h4>
+            <span id="badgeFirebaseConnStatus" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-bold">🔥 Firebase Aktif</span>
           </div>
-        </details>
+          <p class="text-[11px] text-slate-300 leading-relaxed">
+            Kurumsal <strong>Google Firebase Realtime Database</strong> sunucunuz (<code class="text-amber-300">ikv-52-default-rtdb</code>) uygulamaya varsayılan olarak gömülmüştür:
+          </p>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <input type="url" id="inputCustomFirebaseUrl" value="https://ikv-52-default-rtdb.europe-west1.firebasedatabase.app" placeholder="https://ikv-52-default-rtdb.europe-west1.firebasedatabase.app" class="flex-1 bg-slate-900 border border-amber-500/40 rounded-xl px-3 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-amber-400">
+            <button type="button" id="btnSaveAndTestFirebase" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black px-3.5 py-2.5 rounded-xl text-xs transition shadow active:scale-95 whitespace-nowrap flex items-center justify-center gap-1.5">
+              <span>🔥</span>
+              <span>Test Et &amp; Eşitle</span>
+            </button>
+          </div>
+          <p id="txtFirebaseTestStatus" class="text-[10px] text-slate-400">
+            <span class="text-emerald-400 font-bold">✓ Bağlı Google Firebase Sunucusu:</span> <code class="text-slate-200">https://ikv-52-default-rtdb.europe-west1.firebasedatabase.app</code>
+          </p>
+        </div>
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-800 shrink-0">
@@ -23721,15 +23730,17 @@
     // ==========================================
     // CANLI BULUT SENKRONİZASYON & CİHAZLAR ARASI EŞİTLEME MOTORU (KESİN ÇÖZÜM - TIMEOUT & TÜRKÇE KARAKTER & WATCHDOG KORUMALI)
     // ==========================================
+    const DEFAULT_FIREBASE_URL = 'https://ikv-52-default-rtdb.europe-west1.firebasedatabase.app';
     let cloudSyncConfig = {
       roomCode: 'İK52',
       autoSync: true,
-      customFirebaseUrl: '',
+      customFirebaseUrl: DEFAULT_FIREBASE_URL,
       lastSyncTimestamp: 0,
       deletedIds: [],
       deviceId: 'dev-' + Math.random().toString(36).substring(2, 9)
     };
     let cloudEventSource = null;
+    let cloudPollingInterval = null;
     let isSyncingFromCloud = false;
     let cloudPushTimer = null;
     let cloudStatusWatchdog = null;
@@ -23742,7 +23753,13 @@
           cloudSyncConfig = Object.assign(cloudSyncConfig, parsed);
           if (!Array.isArray(cloudSyncConfig.deletedIds)) cloudSyncConfig.deletedIds = [];
         }
-      } catch (e) {}
+        if (!cloudSyncConfig.customFirebaseUrl || !cloudSyncConfig.customFirebaseUrl.startsWith('http')) {
+          cloudSyncConfig.customFirebaseUrl = DEFAULT_FIREBASE_URL;
+          saveCloudSyncConfig();
+        }
+      } catch (e) {
+        cloudSyncConfig.customFirebaseUrl = DEFAULT_FIREBASE_URL;
+      }
     }
 
     function saveCloudSyncConfig() {
@@ -23763,12 +23780,54 @@
       return String(str || '').replace(/[İIıiŞşĞğÜüÖöÇç]/g, ch => trMap[ch] || ch).toUpperCase();
     }
 
+    function sanitizeFirebaseBaseUrl(rawUrl) {
+      let u = String(rawUrl || '').trim();
+      if (!u) return '';
+      u = u.replace(/\.json(\?.*)?$/i, '');
+      u = u.replace(/\/+$/, '');
+      try {
+        const parsed = new URL(u);
+        return parsed.origin;
+      } catch (e) {
+        return u;
+      }
+    }
+
+    function updateFirebaseStatusBadge() {
+      const badge = document.getElementById('badgeFirebaseConnStatus');
+      const statusTxt = document.getElementById('txtFirebaseTestStatus');
+      const fbUrl = sanitizeFirebaseBaseUrl(cloudSyncConfig.customFirebaseUrl);
+      if (fbUrl && fbUrl.startsWith('http')) {
+        if (badge) {
+          badge.innerText = '🔥 Firebase Aktif';
+          badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-bold';
+        }
+        if (statusTxt) {
+          statusTxt.innerHTML = '<span class="text-emerald-400 font-bold">✓ Bağlı Google Firebase Sunucusu:</span> <code class="text-slate-200">' + fbUrl + '</code>';
+        }
+      } else {
+        if (badge) {
+          badge.innerText = 'Link Bekleniyor';
+          badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold';
+        }
+      }
+    }
+
     function syncRoomCodeInputToConfig() {
       const inp = document.getElementById('inputCloudRoomCode');
       if (inp && inp.value && inp.value.trim()) {
         cloudSyncConfig.roomCode = inp.value.trim().toUpperCase();
-        saveCloudSyncConfig();
       }
+      const fbInp = document.getElementById('inputCustomFirebaseUrl');
+      if (fbInp && typeof fbInp.value === 'string') {
+        const cleanedFb = sanitizeFirebaseBaseUrl(fbInp.value);
+        if (cleanedFb) {
+          cloudSyncConfig.customFirebaseUrl = cleanedFb;
+          fbInp.value = cleanedFb;
+        }
+      }
+      saveCloudSyncConfig();
+      updateFirebaseStatusBadge();
     }
 
     function getSanitizedRoomTopic() {
@@ -23852,7 +23911,8 @@
           date: med.date || '',
           notes: med.notes || '',
           externalUrl: med.externalUrl || '',
-          cloudBlobUrl: med.cloudBlobUrl || ''
+          cloudBlobUrl: med.cloudBlobUrl || '',
+          thumbData: med.thumbData || ''
         };
         if (med.externalUrl) {
           copy.data = med.externalUrl;
@@ -24486,7 +24546,17 @@
         try { cloudEventSource.close(); } catch (e) {}
         cloudEventSource = null;
       }
+      if (cloudPollingInterval) {
+        clearInterval(cloudPollingInterval);
+        cloudPollingInterval = null;
+      }
       if (!cloudSyncConfig.autoSync) return;
+
+      cloudPollingInterval = setInterval(() => {
+        if (cloudSyncConfig.autoSync && !isSyncingFromCloud && document.visibilityState === 'visible') {
+          pullStoreFromCloud(false);
+        }
+      }, 8000);
 
       const topic = getSanitizedRoomTopic();
       try {
@@ -28866,10 +28936,11 @@ function showToast(msg) {
       // BULUT EŞİTLEME MODALI VE BUTONLARI
       const modalCloudSync = document.getElementById('modalCloudSync');
       function openCloudSyncModal() {
-        document.getElementById('inputCloudRoomCode').value = cloudSyncConfig.roomCode || 'INANIR-VINC-MERKEZ';
+        document.getElementById('inputCloudRoomCode').value = cloudSyncConfig.roomCode || 'İK52';
         document.getElementById('chkAutoCloudSync').checked = !!cloudSyncConfig.autoSync;
-        document.getElementById('inputCustomFirebaseUrl').value = cloudSyncConfig.customFirebaseUrl || '';
+        document.getElementById('inputCustomFirebaseUrl').value = cloudSyncConfig.customFirebaseUrl || DEFAULT_FIREBASE_URL;
         updateCloudSyncUIStatus('Aktif');
+        updateFirebaseStatusBadge();
         modalCloudSync.classList.remove('hidden');
       }
 
@@ -28878,14 +28949,72 @@ function showToast(msg) {
       document.getElementById('btnCloseCloudSyncBottom')?.addEventListener('click', () => modalCloudSync.classList.add('hidden'));
 
       document.getElementById('btnSaveCloudRoomCode')?.addEventListener('click', () => {
-        const code = document.getElementById('inputCloudRoomCode').value.trim().toUpperCase() || 'INANIR-VINC-MERKEZ';
+        const code = document.getElementById('inputCloudRoomCode').value.trim().toUpperCase() || 'İK52';
         cloudSyncConfig.roomCode = code;
         cloudSyncConfig.autoSync = document.getElementById('chkAutoCloudSync').checked;
-        cloudSyncConfig.customFirebaseUrl = document.getElementById('inputCustomFirebaseUrl').value.trim();
+        const cleanedFb = sanitizeFirebaseBaseUrl(document.getElementById('inputCustomFirebaseUrl').value);
+        cloudSyncConfig.customFirebaseUrl = cleanedFb;
+        document.getElementById('inputCustomFirebaseUrl').value = cleanedFb;
         saveCloudSyncConfig();
+        updateFirebaseStatusBadge();
         startLiveCloudSubscription();
         pullStoreFromCloud(true);
         showToast('🔑 Eşitleme kodu kaydedildi ve bulut senkronizasyonu başlatıldı!');
+      });
+
+      document.getElementById('btnSaveAndTestFirebase')?.addEventListener('click', async () => {
+        const fbInput = document.getElementById('inputCustomFirebaseUrl');
+        const cleanedFb = sanitizeFirebaseBaseUrl(fbInput ? fbInput.value : '');
+        const statusTxt = document.getElementById('txtFirebaseTestStatus');
+        const btnFb = document.getElementById('btnSaveAndTestFirebase');
+
+        if (!cleanedFb || !cleanedFb.startsWith('https://')) {
+          showToast('⚠️ Lütfen https:// ile başlayan Firebase Realtime Database adresinizi yapıştırın!');
+          if (statusTxt) {
+            statusTxt.innerHTML = '<span class="text-amber-400 font-bold">⚠️ Lütfen Firebase Console -> Realtime Database ekranındaki https://... adresini kutuya yapıştırın.</span>';
+          }
+          return;
+        }
+
+        fbInput.value = cleanedFb;
+        cloudSyncConfig.customFirebaseUrl = cleanedFb;
+        syncRoomCodeInputToConfig();
+
+        const origHtml = btnFb ? btnFb.innerHTML : '';
+        if (btnFb) {
+          btnFb.disabled = true;
+          btnFb.innerHTML = '<span>⏳</span><span>Test Ediliyor...</span>';
+        }
+        if (statusTxt) {
+          statusTxt.innerHTML = '<span class="text-sky-400 font-bold">⏳ Google Firebase veritabanına bağlanılıyor...</span>';
+        }
+
+        try {
+          const primaryTopic = getCandidateRoomTopics()[0];
+          const testUrl = cleanedFb + '/' + primaryTopic + '.json';
+          const getRes = await fetchWithTimeout(testUrl, {}, 5000);
+          if (!getRes.ok) {
+            throw new Error('HTTP ' + getRes.status + ' (Kuralların Test Mode / true olduğundan emin olun)');
+          }
+          await pullStoreFromCloud(false);
+          await pushAllLocalMediaBlobsToCloud(false);
+          await pushStoreToCloud(false);
+          updateFirebaseStatusBadge();
+          if (statusTxt) {
+            statusTxt.innerHTML = '<span class="text-emerald-400 font-bold">✓ Google Firebase Bağlantısı Başarılı!</span> Tüm servis fişleri, makineler ve PDF/görseller Firebase sunucunuzla eşitlendi.';
+          }
+          showToast('🔥 Google Firebase başarıyla bağlandı ve tüm veriler eşitlendi!');
+        } catch (err) {
+          if (statusTxt) {
+            statusTxt.innerHTML = '<span class="text-red-400 font-bold">❌ Bağlantı Hatası:</span> ' + (err.message || 'Adres veya izin kuralları kontrol edilmeli.') + ' (Realtime Database -> Rules kısmında read/write true olmalıdır).';
+          }
+          showToast('⚠️ Firebase bağlantı uyarısı: ' + (err.message || 'Adresi kontrol edin'));
+        } finally {
+          if (btnFb) {
+            btnFb.disabled = false;
+            btnFb.innerHTML = origHtml || '<span>🔥</span><span>Kaydet &amp; Bağla</span>';
+          }
+        }
       });
 
       document.getElementById('chkAutoCloudSync')?.addEventListener('change', (e) => {
