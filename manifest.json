@@ -1,21 +1,22 @@
 {
-  "name": "İnanır Kule Vinç - Saha Teşhis & Servis Sistemi",
+  "name": "İnanır Kule Vinç - Saha Teşhis Sistemi",
   "short_name": "İnanır Vinç",
-  "description": "Kule vinç şemaları, servis fişleri ve sürücü arıza teşhis merkezi",
-  "start_url": "./",
+  "description": "Kule vinç şemaları, servis formları ve sürücü teşhis merkezi (%100 Çevrimdışı Çalışır)",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "icons": [
     {
-      "src": "inanir_kule_vinc_icon.png",
+      "src": "./inanir_kule_vinc_icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "inanir_kule_vinc_icon.svg",
+      "src": "./inanir_kule_vinc_icon.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
