@@ -23595,37 +23595,90 @@
       modal.classList.remove('hidden');
     }
 
+    function getDeletedModelKey(brandId, modelName) {
+      return 'modname_' + String(brandId || '').trim() + '_' + String(modelName || '').toLowerCase().trim();
+    }
+
+    function getDeletedBrandKey(brandName) {
+      return 'brandname_' + String(brandName || '').toLowerCase().trim();
+    }
+
     function deleteModel(brandId, modelId) {
       const brand = store.brands.find(b => b.id === brandId);
       if (!brand) return;
       const model = brand.models.find(m => m.id === modelId);
       if (!model) return;
 
-      brand.models = brand.models.filter(m => m.id !== modelId);
-      saveStore();
+      if (!Array.isArray(cloudSyncConfig.deletedIds)) cloudSyncConfig.deletedIds = [];
+      const targetNameLower = (model.name || '').toLowerCase().trim();
+      const modKey = getDeletedModelKey(brand.id, model.name);
+      if (!cloudSyncConfig.deletedIds.includes(modelId)) cloudSyncConfig.deletedIds.push(modelId);
+      if (modKey && !cloudSyncConfig.deletedIds.includes(modKey)) cloudSyncConfig.deletedIds.push(modKey);
+
+      // Aynı isimle mükerrer oluşmuş model veya medya varsa onları da silinenlere ekle
+      (brand.models || []).forEach(m => {
+        if (m.id === modelId || (targetNameLower && (m.name || '').toLowerCase().trim() === targetNameLower)) {
+          if (!cloudSyncConfig.deletedIds.includes(m.id)) cloudSyncConfig.deletedIds.push(m.id);
+          (m.media || []).forEach(med => {
+            if (med && med.id) {
+              if (!cloudSyncConfig.deletedIds.includes(med.id)) cloudSyncConfig.deletedIds.push(med.id);
+              deleteMediaBlobFromIDB(med.id);
+            }
+          });
+        }
+      });
+      saveCloudSyncConfig();
+
+      brand.models = (brand.models || []).filter(m => m.id !== modelId && (!targetNameLower || (m.name || '').toLowerCase().trim() !== targetNameLower));
+      saveStore(false);
+      pushStoreToCloud(false);
+
       if (selectedModelId === modelId) {
         switchView('models');
       } else {
-        renderModels();
+        renderModels(document.getElementById('inputModelSearch')?.value || '');
       }
-      showToast('"' + model.name + '" modeli başarıyla silindi');
+      renderBrands(document.getElementById('inputBrandSearch')?.value || '');
+      showToast('"' + model.name + '" modeli tüm cihazlardan silindi');
     }
 
     function deleteBrand(brandId) {
       const brand = store.brands.find(b => b.id === brandId);
       if (!brand) return;
 
+      if (!Array.isArray(cloudSyncConfig.deletedIds)) cloudSyncConfig.deletedIds = [];
+      const brandKey = getDeletedBrandKey(brand.name);
+      if (!cloudSyncConfig.deletedIds.includes(brandId)) cloudSyncConfig.deletedIds.push(brandId);
+      if (brandKey && !cloudSyncConfig.deletedIds.includes(brandKey)) cloudSyncConfig.deletedIds.push(brandKey);
+
+      (brand.models || []).forEach(m => {
+        if (m && m.id && !cloudSyncConfig.deletedIds.includes(m.id)) cloudSyncConfig.deletedIds.push(m.id);
+        const modKey = getDeletedModelKey(brand.id, m.name);
+        if (modKey && !cloudSyncConfig.deletedIds.includes(modKey)) cloudSyncConfig.deletedIds.push(modKey);
+        (m.media || []).forEach(med => {
+          if (med && med.id) {
+            if (!cloudSyncConfig.deletedIds.includes(med.id)) cloudSyncConfig.deletedIds.push(med.id);
+            deleteMediaBlobFromIDB(med.id);
+          }
+        });
+      });
+      saveCloudSyncConfig();
+
       store.brands = store.brands.filter(b => b.id !== brandId);
-      saveStore();
+      saveStore(false);
+      pushStoreToCloud(false);
+
       if (selectedBrandId === brandId) {
         switchView('brands');
       } else {
-        renderBrands();
+        renderBrands(document.getElementById('inputBrandSearch')?.value || '');
       }
-      showToast('"' + brand.name + '" markası silindi');
+      showToast('"' + brand.name + '" markası tüm cihazlardan silindi');
     }
 
     function mergeWithDefaultLibraries() {
+      const deletedSet = new Set(cloudSyncConfig.deletedIds || []);
+
       // 1. Sürücü kütüphanesini (DRIVE_LIBRARY) birleştir: eksik sürücüleri, arıza kodlarını ve parametreleri tamamla
       if (!Array.isArray(store.drives) || store.drives.length === 0) {
         store.drives = JSON.parse(JSON.stringify(DRIVE_LIBRARY));
@@ -23653,17 +23706,21 @@
         });
       }
 
-      // 2. Kule vinç marka ve modellerini (CRANE_DATA) birleştir: eksik arıza kodlarını tamamla
+      // 2. Kule vinç marka ve modellerini (CRANE_DATA) birleştir (Silinen marka ve modelleri asla geri getirme!)
       if (!Array.isArray(store.brands) || store.brands.length === 0) {
         store.brands = JSON.parse(JSON.stringify(CRANE_DATA));
       } else {
         CRANE_DATA.forEach(defBrand => {
+          if (deletedSet.has(defBrand.id) || deletedSet.has(getDeletedBrandKey(defBrand.name))) return;
           const existingBrand = store.brands.find(b => b.id === defBrand.id);
           if (!existingBrand) {
-            store.brands.push(JSON.parse(JSON.stringify(defBrand)));
+            const brandCopy = JSON.parse(JSON.stringify(defBrand));
+            brandCopy.models = (brandCopy.models || []).filter(m => !deletedSet.has(m.id) && !deletedSet.has(getDeletedModelKey(defBrand.id, m.name)));
+            store.brands.push(brandCopy);
           } else {
             if (!Array.isArray(existingBrand.models)) existingBrand.models = [];
             (defBrand.models || []).forEach(defModel => {
+              if (deletedSet.has(defModel.id) || deletedSet.has(getDeletedModelKey(defBrand.id, defModel.name))) return;
               const existingModel = existingBrand.models.find(m => m.id === defModel.id);
               if (!existingModel) {
                 existingBrand.models.push(JSON.parse(JSON.stringify(defModel)));
@@ -23671,7 +23728,7 @@
                 if (!Array.isArray(existingModel.codes)) existingModel.codes = [];
                 const existingCodes = new Set(existingModel.codes.map(c => (c.code || '').toLowerCase().trim()));
                 (defModel.codes || []).forEach(dc => {
-                  if (!existingCodes.has((dc.code || '').toLowerCase().trim())) {
+                  if (!deletedSet.has(dc.id) && !existingCodes.has((dc.code || '').toLowerCase().trim())) {
                     existingModel.codes.push(JSON.parse(JSON.stringify(dc)));
                   }
                 });
@@ -23680,6 +23737,20 @@
           }
         });
       }
+
+      // Mevcut listede silinmiş olarak işaretlenen marka/model/medya varsa temizle
+      store.brands = (store.brands || []).filter(b => !deletedSet.has(b.id) && !deletedSet.has(getDeletedBrandKey(b.name)));
+      store.brands.forEach(b => {
+        b.models = (b.models || []).filter(m => !deletedSet.has(m.id) && !deletedSet.has(getDeletedModelKey(b.id, m.name)));
+        b.models.forEach(m => {
+          if (Array.isArray(m.media)) {
+            m.media = m.media.filter(med => !deletedSet.has(med.id));
+          }
+          if (Array.isArray(m.codes)) {
+            m.codes = m.codes.filter(c => !deletedSet.has(c.id));
+          }
+        });
+      });
     }
 
     function loadStore() {
@@ -23887,11 +23958,16 @@
 
       const currentIds = new Set([
         ...(store.serviceForms || []).map(s => s.id),
-        ...(store.machines || []).map(m => m.id)
+        ...(store.machines || []).map(m => m.id),
+        ...(store.brands || []).map(b => b.id),
+        ...(store.brands || []).flatMap(b => (b.models || []).map(m => m.id))
       ]);
+      const defaultModelIds = CRANE_DATA.flatMap(b => (b.models || []).map(m => m.id));
       const deletedSampleIds = [
         ...SAMPLE_SERVICE_FORMS.map(s => s.id).filter(id => !currentIds.has(id)),
         ...SAMPLE_MACHINES.map(m => m.id).filter(id => !currentIds.has(id)),
+        ...CRANE_DATA.map(b => b.id).filter(id => !currentIds.has(id)),
+        ...defaultModelIds.filter(id => !currentIds.has(id)),
         ...(cloudSyncConfig.deletedIds || [])
       ];
 
@@ -24042,17 +24118,17 @@
       if (!payload || typeof payload !== 'object') return false;
       let changed = false;
 
-      const deletedSet = new Set(payload.deletedIds || []);
+      const deletedSet = new Set([...(cloudSyncConfig.deletedIds || []), ...(payload.deletedIds || [])]);
       if (deletedSet.size > 0) {
         const prevFormLen = (store.serviceForms || []).length;
         store.serviceForms = (store.serviceForms || []).filter(f => !deletedSet.has(f.id));
         if (store.serviceForms.length !== prevFormLen) changed = true;
 
         const prevMacLen = (store.machines || []).length;
-        store.machines = (store.machines || []).filter(m => !deletedSet.has(m.id));
+        store.machines = (store.machines || []).filter(m => !deletedSet.has(m.id) && !deletedSet.has('macserial_' + String(m.serialNo || '').toLowerCase().trim()));
         if (store.machines.length !== prevMacLen) changed = true;
 
-        cloudSyncConfig.deletedIds = Array.from(new Set([...(cloudSyncConfig.deletedIds || []), ...deletedSet]));
+        cloudSyncConfig.deletedIds = Array.from(deletedSet);
       }
 
       if (Array.isArray(payload.serviceForms)) {
@@ -24109,14 +24185,21 @@
       }
 
       if (deletedSet.size > 0) {
+        const prevBrandLen = (store.brands || []).length;
+        store.brands = (store.brands || []).filter(b => !deletedSet.has(b.id) && !deletedSet.has(getDeletedBrandKey(b.name)));
+        if (store.brands.length !== prevBrandLen) changed = true;
+
         (store.brands || []).forEach(b => {
           const prevModLen = (b.models || []).length;
-          b.models = (b.models || []).filter(m => !deletedSet.has(m.id));
+          b.models = (b.models || []).filter(m => !deletedSet.has(m.id) && !deletedSet.has(getDeletedModelKey(b.id, m.name)));
           if (b.models.length !== prevModLen) changed = true;
           (b.models || []).forEach(m => {
             const prevMedLen = (m.media || []).length;
             m.media = (m.media || []).filter(med => !deletedSet.has(med.id));
             if (m.media.length !== prevMedLen) changed = true;
+            const prevCodeLen = (m.codes || []).length;
+            m.codes = (m.codes || []).filter(c => !deletedSet.has(c.id));
+            if (m.codes.length !== prevCodeLen) changed = true;
           });
         });
       }
@@ -24145,15 +24228,17 @@
 
       if (Array.isArray(payload.customBrands)) {
         payload.customBrands.forEach(cb => {
-          if (!cb || deletedSet.has(cb.id)) return;
+          if (!cb || deletedSet.has(cb.id) || deletedSet.has(getDeletedBrandKey(cb.name))) return;
           let existingBrand = store.brands.find(b => b.id === cb.id || b.name.toLowerCase() === cb.name.toLowerCase());
           if (!existingBrand) {
-            store.brands.push(cb);
+            const cbCopy = Object.assign({}, cb);
+            cbCopy.models = (cb.models || []).filter(cm => cm && !deletedSet.has(cm.id) && !deletedSet.has(getDeletedModelKey(cb.id, cm.name)));
+            store.brands.push(cbCopy);
             changed = true;
           } else {
             if (!Array.isArray(existingBrand.models)) existingBrand.models = [];
             (cb.models || []).forEach(cm => {
-              if (!cm || deletedSet.has(cm.id)) return;
+              if (!cm || deletedSet.has(cm.id) || deletedSet.has(getDeletedModelKey(existingBrand.id, cm.name)) || deletedSet.has(getDeletedModelKey(cb.id, cm.name))) return;
               let existingMod = existingBrand.models.find(m => m.id === cm.id || m.name.toLowerCase() === cm.name.toLowerCase());
               if (!existingMod) {
                 existingBrand.models.push(cm);
@@ -24163,7 +24248,7 @@
                 if (Array.isArray(cm.codes)) {
                   if (!existingMod.codes) existingMod.codes = [];
                   cm.codes.forEach(ec => {
-                    if (!existingMod.codes.some(c => c.id === ec.id || c.code === ec.code)) {
+                    if (!deletedSet.has(ec.id) && !existingMod.codes.some(c => c.id === ec.id || c.code === ec.code)) {
                       existingMod.codes.unshift(ec);
                       changed = true;
                     }
@@ -24180,7 +24265,7 @@
           const brand = store.brands.find(b => b.id === brandId);
           if (brand) {
             (payload.customModelsByBrand[brandId] || []).forEach(cm => {
-              if (!cm || deletedSet.has(cm.id)) return;
+              if (!cm || deletedSet.has(cm.id) || deletedSet.has(getDeletedModelKey(brandId, cm.name))) return;
               let existingMod = brand.models.find(m => m.id === cm.id || m.name.toLowerCase() === cm.name.toLowerCase());
               if (!existingMod) {
                 brand.models.push(cm);
@@ -24501,6 +24586,17 @@
         await Promise.allSettled(fetchPromises);
 
         if (payloads.length > 0) {
+          // Önce tüm paketlerdeki silinen ID listesini (deletedIds) birleştir ki eski ntfy mesajları silinen modelleri geri getirmesin!
+          const allDeletedUnion = new Set(cloudSyncConfig.deletedIds || []);
+          for (const p of payloads) {
+            if (p && Array.isArray(p.deletedIds)) {
+              p.deletedIds.forEach(id => allDeletedUnion.add(id));
+            }
+          }
+          if (allDeletedUnion.size !== (cloudSyncConfig.deletedIds || []).length) {
+            cloudSyncConfig.deletedIds = Array.from(allDeletedUnion);
+            saveCloudSyncConfig();
+          }
           payloads.sort((a, b) => a.ts - b.ts);
           for (const p of payloads) {
             if (mergeIncomingCloudPayload(p, false)) {
@@ -25047,6 +25143,9 @@ let toastHideTimer = null;
           if (!brand) return;
           const model = brand.models.find(m => m.id === selectedModelId);
           if (!model) return;
+          if (!Array.isArray(cloudSyncConfig.deletedIds)) cloudSyncConfig.deletedIds = [];
+          if (code.id && !cloudSyncConfig.deletedIds.includes(code.id)) cloudSyncConfig.deletedIds.push(code.id);
+          saveCloudSyncConfig();
           model.codes = (model.codes || []).filter(c => c.id !== code.id);
           saveStore();
           renderModelCodesList(model.codes || []);
@@ -25532,7 +25631,10 @@ let toastHideTimer = null;
       if (statusEl) statusEl.innerText = text;
     }
 
-    function showCloudUploadBanner(title, pct, subText = '') {
+    let isUploadBannerDismissedByUser = false;
+    function showCloudUploadBanner(title, pct, subText = '', resetDismiss = false) {
+      if (resetDismiss) isUploadBannerDismissedByUser = false;
+      if (isUploadBannerDismissedByUser) return;
       let banner = document.getElementById('cloudPdfUploadModalBanner');
       if (!banner) {
         banner = document.createElement('div');
@@ -25546,10 +25648,18 @@ let toastHideTimer = null;
               <div id="barUploadBannerProgress" class="bg-gradient-to-r from-amber-500 to-emerald-400 h-full rounded-full transition-all duration-200" style="width: 5%"></div>
             </div>
             <p id="txtUploadBannerSub" class="text-xs font-mono font-bold text-amber-400">%0</p>
-            <p class="text-[11px] text-slate-400">Diğer cihazlardan anında açılabilmesi için bulut sunucusuna kaydediliyor, lütfen bekleyin...</p>
+            <p class="text-[11px] text-slate-400">Diğer cihazlardan anında açılabilmesi için bulut sunucusuna kaydediliyor...</p>
+            <button type="button" id="btnDismissUploadBanner" class="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2 px-3 rounded-xl text-xs border border-slate-700 transition active:scale-95">
+              ✕ Arka Planda Devam Et (Ekranı Kapat)
+            </button>
           </div>
         `;
         document.body.appendChild(banner);
+        document.getElementById('btnDismissUploadBanner')?.addEventListener('click', () => {
+          isUploadBannerDismissedByUser = true;
+          hideCloudUploadBanner();
+          showToast('☁️ Yükleme arka planda sessizce devam ediyor...');
+        });
       }
       banner.classList.remove('hidden');
       const tEl = document.getElementById('txtUploadBannerTitle');
@@ -25586,7 +25696,32 @@ let toastHideTimer = null;
           if (totalBytes < 50) return false;
 
           const fbBase = sanitizeFirebaseBaseUrl(cloudSyncConfig.customFirebaseUrl || DEFAULT_FIREBASE_URL);
-          const FB_CHUNK_SIZE = 262143; // 3'ün tam katı (~256 KB ikili = ~349 KB Base64, çok hızlı ve hatasız)
+          // Önce Firebase üzerinde bu PDF zaten tam olarak yüklü mü kontrol et (Tekrar tekrar yüklemeyi önler)
+          if (fbBase && fbBase.startsWith('http')) {
+            try {
+              const existRes = await fetchWithTimeout(`${fbBase}/${globalTopic}/meta.json`, {}, 3500);
+              if (existRes.ok) {
+                const existMeta = await existRes.json();
+                if (existMeta && existMeta.size === totalBytes && (existMeta.fbChunks > 0 || (existMeta.bbKeys && existMeta.bbKeys.length > 0))) {
+                  const existStr = JSON.stringify(existMeta);
+                  if (itemRef) itemRef.cloudBlobUrl = existStr;
+                  (store.brands || []).forEach(b => (b.models || []).forEach(m => (m.media || []).forEach(med => {
+                    if (med.id === mediaId) med.cloudBlobUrl = existStr;
+                  })));
+                  try {
+                    localStorage.setItem('ikv_cloud_v4_' + mediaId, '1');
+                    localStorage.setItem('ikv_cloud_v3_' + mediaId, '1');
+                    localStorage.setItem('ikv_fb_pushed_v2_' + mediaId, '1');
+                  } catch (e) {}
+                  const roomTopic = getSanitizedRoomTopic();
+                  fetch(`${fbBase}/${roomTopic}_req/${mediaId}.json`, { method: 'DELETE' }).catch(() => {});
+                  if (onProgress) onProgress(100, '✓ Bulutta Zaten Mevcut!');
+                  return true;
+                }
+              }
+            } catch (e) {}
+          }
+          const FB_CHUNK_SIZE = 524286; // 3'ün tam katı (~512 KB ikili, 2 kat daha hızlı yükleme)
           const totalFbChunks = Math.max(1, Math.ceil(totalBytes / FB_CHUNK_SIZE));
 
           const BB_CHUNK_SIZE = 1572864; // 1.5 MB raw binary
@@ -25787,18 +25922,16 @@ let toastHideTimer = null;
         for (const mediaId of Object.keys(reqMap)) {
           const reqObj = reqMap[mediaId];
           if (!reqObj || reqObj.deviceId === cloudSyncConfig.deviceId) continue;
+          // İsteği hemen temizle ki her sayfa açılışında kısır döngüye girmesin
+          fetch(`${fbBase}/${roomTopic}_req/${mediaId}.json`, { method: 'DELETE' }).catch(() => {});
           const localBlob = await getMediaBlobFromIDB(mediaId);
           if (localBlob) {
             let foundItem = null;
             (store.brands || []).forEach(b => (b.models || []).forEach(m => (m.media || []).forEach(med => {
               if (med.id === mediaId) foundItem = med;
             })));
-            const tName = (foundItem && foundItem.title) ? foundItem.title : 'PDF Şema';
-            showCloudUploadBanner(`☁️ "${tName}" Diğer Cihaz İçin Buluta Gönderiliyor...`, 10, 'Aktarım başlatıldı...');
-            const ok = await pushMediaBlobToCloud(mediaId, localBlob, foundItem, (pct, msg) => {
-              showCloudUploadBanner(`☁️ "${tName}" Buluta Gönderiliyor...`, pct, msg);
-            });
-            hideCloudUploadBanner();
+            // Arka planda tamamen sessizce gönder (ekranı kilitleyen popup açma!)
+            const ok = await pushMediaBlobToCloud(mediaId, localBlob, foundItem, null);
             if (ok) {
               saveStore(false);
               await pushStoreToCloud(false);
@@ -26011,7 +26144,7 @@ let toastHideTimer = null;
       return null;
     }
 
-    async function pushAllLocalMediaBlobsToCloud(onlyUnpushed = false) {
+    async function pushAllLocalMediaBlobsToCloud(onlyUnpushed = false, showModal = false) {
       let pushedCount = 0;
       let anyUrlUpdated = false;
       for (const b of (store.brands || [])) {
@@ -26019,18 +26152,21 @@ let toastHideTimer = null;
           for (const med of (m.media || [])) {
             if (med && med.id && !med.externalUrl && med.id !== 'med-p1') {
               const hasV4Manifest = med.cloudBlobUrl && (med.cloudBlobUrl.includes('"v":4') || med.cloudBlobUrl.includes('"v":3'));
-              if (onlyUnpushed && hasV4Manifest && localStorage.getItem('ikv_cloud_v4_' + med.id) === '1') {
+              if (onlyUnpushed && (hasV4Manifest || localStorage.getItem('ikv_cloud_v4_' + med.id) === '1' || sessionStorage.getItem('ikv_bg_tried_' + med.id) === '1')) {
                 continue;
               }
               const localBlob = await getMediaBlobFromIDB(med.id);
               if (localBlob) {
+                try { sessionStorage.setItem('ikv_bg_tried_' + med.id, '1'); } catch (e) {}
                 const prevUrl = med.cloudBlobUrl;
                 const tName = med.title || 'PDF Şema';
-                showCloudUploadBanner(`☁️ "${tName}" Bulut Sunucusuna Eşitleniyor...`, 10, 'Cihazlar arası erişim için yükleniyor...');
-                const ok = await pushMediaBlobToCloud(med.id, localBlob, med, (pct, msg) => {
+                if (showModal) {
+                  showCloudUploadBanner(`☁️ "${tName}" Bulut Sunucusuna Eşitleniyor...`, 10, 'Cihazlar arası erişim için yükleniyor...', true);
+                }
+                const ok = await pushMediaBlobToCloud(med.id, localBlob, med, showModal ? (pct, msg) => {
                   showCloudUploadBanner(`☁️ "${tName}" Bulut Sunucusuna Eşitleniyor...`, pct, msg);
-                });
-                hideCloudUploadBanner();
+                } : null);
+                if (showModal) hideCloudUploadBanner();
                 if (ok) {
                   pushedCount++;
                   if (med.cloudBlobUrl !== prevUrl) anyUrlUpdated = true;
@@ -26065,14 +26201,10 @@ let toastHideTimer = null;
                 });
               } else {
                 const hasV4Manifest = med.cloudBlobUrl && (med.cloudBlobUrl.includes('"v":4') || med.cloudBlobUrl.includes('"v":3'));
-                if (!hasV4Manifest || localStorage.getItem('ikv_cloud_v4_' + med.id) !== '1') {
-                  // Bu cihazda yerel olarak var ama henüz bulut sunucusuna yüklenmemişse otomatik yükle ve Store'u eşitle!
-                  const tName = med.title || 'PDF Şema';
-                  showCloudUploadBanner(`☁️ "${tName}" Buluta Gönderiliyor...`, 10, 'Diğer cihazlar için buluta yedekleniyor...');
-                  pushMediaBlobToCloud(med.id, existing, med, (pct, msg) => {
-                    showCloudUploadBanner(`☁️ "${tName}" Buluta Gönderiliyor...`, pct, msg);
-                  }).then(async (ok) => {
-                    hideCloudUploadBanner();
+                if (!hasV4Manifest && localStorage.getItem('ikv_cloud_v4_' + med.id) !== '1' && sessionStorage.getItem('ikv_bg_tried_' + med.id) !== '1') {
+                  // Arka planda tamamen sessizce yükle (kullanıcı ekranına asla popup çıkarma)
+                  try { sessionStorage.setItem('ikv_bg_tried_' + med.id, '1'); } catch (e) {}
+                  pushMediaBlobToCloud(med.id, existing, med, null).then(async (ok) => {
                     if (ok) {
                       saveStore(false);
                       await pushStoreToCloud(false);
@@ -26340,8 +26472,7 @@ let toastHideTimer = null;
     function applyViewerZoom(zoomLevel) {
       currentZoom = Math.round(zoomLevel * 100) / 100;
       const img = document.getElementById('viewerImage');
-      const singleCanvasWrap = document.getElementById('singlePdfCanvasWrapper');
-      const container = document.getElementById('viewerContainer');
+            const container = document.getElementById('viewerContainer');
       const zoomBadge = document.getElementById('txtZoomBadge');
 
       if (img && !img.classList.contains('hidden')) {
@@ -26356,10 +26487,6 @@ let toastHideTimer = null;
         }
       }
 
-      if (singleCanvasWrap) {
-        singleCanvasWrap.style.width = `${Math.round(currentZoom * 100)}%`;
-        singleCanvasWrap.style.maxWidth = currentZoom > 1 ? 'none' : '54rem';
-      }
 
       if (zoomBadge) {
         zoomBadge.innerText = `%${Math.round(currentZoom * 100)}`;
@@ -26375,11 +26502,6 @@ let toastHideTimer = null;
       if (activePdfRenderTask) {
         try { activePdfRenderTask.cancel(); } catch (e) {}
         activePdfRenderTask = null;
-      }
-      const existingCanvas = document.getElementById('singlePdfCanvas');
-      if (existingCanvas) {
-        existingCanvas.width = 1;
-        existingCanvas.height = 1;
       }
       if (activePdfDoc) {
         try { activePdfDoc.cleanup(); } catch (e) {}
@@ -26757,7 +26879,7 @@ let toastHideTimer = null;
           };
           model.media.unshift(newPdfItem);
           renderModelDetail();
-          showCloudUploadBanner(`☁️ "${finalTitle}" Buluta Yükleniyor...`, 5, 'Sunucu bağlantısı kuruldu...');
+          showCloudUploadBanner(`☁️ "${finalTitle}" Buluta Yükleniyor...`, 5, 'Sunucu bağlantısı kuruldu...', true);
           const upOk = await pushMediaBlobToCloud(mediaId, blobCopy, newPdfItem, (pct, msg) => {
             showCloudUploadBanner(`☁️ "${finalTitle}" Buluta Yükleniyor...`, pct, msg);
           });
@@ -26866,13 +26988,29 @@ let toastHideTimer = null;
             <p class="text-[11px] text-slate-400 line-clamp-1">${m.nickname || m.siteName || 'Şantiye bilgisi yok'}</p>
           </div>
           <div class="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-800/80">
-            <span>${m.clientCompany || '-'}</span>
-            <span class="text-amber-400 font-semibold">Tıkla & Geçmişi Aç ›</span>
+            <span class="truncate pr-2">${m.clientCompany || '-'}</span>
+            <div class="flex items-center gap-2 shrink-0">
+              <button type="button" class="btnDeleteFleetMachine text-red-400 hover:text-white bg-slate-900 hover:bg-red-600 px-2 py-0.5 rounded border border-slate-800 font-bold transition" title="Makineyi Sil">🗑️ Sil</button>
+              <span class="text-amber-400 font-semibold">Geçmiş ›</span>
+            </div>
           </div>
         `;
         card.addEventListener('click', () => {
           document.getElementById('inputSerialQuickSearch').value = m.serialNo;
           searchSerialTimeline(m.serialNo);
+        });
+        card.querySelector('.btnDeleteFleetMachine')?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (!Array.isArray(cloudSyncConfig.deletedIds)) cloudSyncConfig.deletedIds = [];
+          if (m.id && !cloudSyncConfig.deletedIds.includes(m.id)) cloudSyncConfig.deletedIds.push(m.id);
+          const sKey = 'macserial_' + String(m.serialNo || '').toLowerCase().trim();
+          if (sKey && !cloudSyncConfig.deletedIds.includes(sKey)) cloudSyncConfig.deletedIds.push(sKey);
+          saveCloudSyncConfig();
+          store.machines = (store.machines || []).filter(x => x.id !== m.id && String(x.serialNo || '').toLowerCase().trim() !== String(m.serialNo || '').toLowerCase().trim());
+          saveStore(false);
+          pushStoreToCloud(false);
+          renderFleetView();
+          showToast('"' + m.serialNo + '" makinesi tüm cihazlardan silindi');
         });
         fleetContainer.appendChild(card);
       });
@@ -28857,9 +28995,15 @@ let toastHideTimer = null;
           notes: document.getElementById('inputNewMachineNotes').value.trim()
         };
 
+        if (Array.isArray(cloudSyncConfig.deletedIds)) {
+          const macKey = "macserial_" + serialNo.toLowerCase().trim();
+          cloudSyncConfig.deletedIds = cloudSyncConfig.deletedIds.filter(x => x !== macKey);
+          saveCloudSyncConfig();
+        }
         if (!store.machines) store.machines = [];
         store.machines.unshift(newMachine);
-        saveStore();
+        saveStore(false);
+        pushStoreToCloud(false);
         modalAddMachine.classList.add('hidden');
         renderFleetView();
         document.getElementById('inputSerialQuickSearch').value = serialNo;
@@ -29078,6 +29222,11 @@ let toastHideTimer = null;
             showToast(`${name} markası güncellendi!`);
           }
         } else {
+          const bKey = getDeletedBrandKey(name);
+          if (Array.isArray(cloudSyncConfig.deletedIds) && cloudSyncConfig.deletedIds.includes(bKey)) {
+            cloudSyncConfig.deletedIds = cloudSyncConfig.deletedIds.filter(x => x !== bKey);
+            saveCloudSyncConfig();
+          }
           store.brands.push({ id: 'b-' + Date.now(), name, country, models: [] });
           saveStore();
           modalAddBrand.classList.add('hidden');
@@ -29125,6 +29274,11 @@ let toastHideTimer = null;
             showToast(`${name} modeli güncellendi!`);
           }
         } else {
+          const mKey = getDeletedModelKey(brand.id, name);
+          if (Array.isArray(cloudSyncConfig.deletedIds) && cloudSyncConfig.deletedIds.includes(mKey)) {
+            cloudSyncConfig.deletedIds = cloudSyncConfig.deletedIds.filter(x => x !== mKey);
+            saveCloudSyncConfig();
+          }
           brand.models.push({
             id: 'm-' + Date.now(),
             name,
