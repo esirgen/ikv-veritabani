@@ -1845,8 +1845,8 @@ a { color: inherit; text-decoration: inherit; }
           </h4>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
-              <label class="block text-slate-400 mb-1 font-semibold">Firma Resmi Tam Ünvanı *</label>
-              <input type="text" id="inputCompName" placeholder="Örn: İnanır Kule Vinç San. ve Tic. Ltd. Şti." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500">
+              <label class="block text-slate-400 mb-1 font-semibold">Firma Resmi Ünvanı (Şahıs / Kaşe Ünvanı) *</label>
+              <input type="text" id="inputCompName" placeholder="Örn: İNANIR KULE VİNÇ - KEMAL DENİZ İNANIR" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500">
             </div>
             <div>
               <label class="block text-slate-400 mb-1 font-semibold">Tabela / Kısa Marka İsmi *</label>
@@ -1865,8 +1865,8 @@ a { color: inherit; text-decoration: inherit; }
             <span>📞</span> İletişim & Adres Bilgileri
           </h4>
           <div>
-            <label class="block text-slate-400 mb-1 font-semibold">Şirket / Merkez Adresi</label>
-            <input type="text" id="inputCompAddress" placeholder="Örn: İkitelli OSB Mah. Demirciler Sanayi Sit. 12. Cad. No: 48, Başakşehir / İstanbul" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500">
+            <label class="block text-slate-400 mb-1 font-semibold">Firma / Kaşe Adresi</label>
+            <input type="text" id="inputCompAddress" placeholder="Örn: Güneşli Mah. 1365. Sk. Altuntaş Apt. No: 18/2 Bağcılar / İstanbul" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500">
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
@@ -1898,21 +1898,21 @@ a { color: inherit; text-decoration: inherit; }
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
               <label class="block text-slate-400 mb-1 font-semibold">Vergi Dairesi</label>
-              <input type="text" id="inputCompTaxOffice" placeholder="Örn: İkitelli Vergi Dairesi" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500">
+              <input type="text" id="inputCompTaxOffice" placeholder="Örn: Güneşli V.D." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500">
             </div>
             <div>
-              <label class="block text-slate-400 mb-1 font-semibold">Vergi Numarası</label>
-              <input type="text" id="inputCompTaxNo" placeholder="Örn: 478 045 8912" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-amber-500">
+              <label class="block text-slate-400 mb-1 font-semibold">T.C. Kimlik / Vergi No</label>
+              <input type="text" id="inputCompTaxNo" placeholder="Örn: 24530450654" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-amber-500">
             </div>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
-              <label class="block text-slate-400 mb-1 font-semibold">Ticaret Sicil No</label>
-              <input type="text" id="inputCompTradeRegNo" placeholder="Örn: 945120-5" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500">
+              <label class="block text-slate-400 mb-1 font-semibold">Ticaret Sicil / İ.T.O No</label>
+              <input type="text" id="inputCompTradeRegNo" placeholder="Örn: İ.T.O - 410938-5" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500">
             </div>
             <div>
-              <label class="block text-slate-400 mb-1 font-semibold">Mersis No</label>
-              <input type="text" id="inputCompMersisNo" placeholder="Örn: 0478045891200001" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500">
+              <label class="block text-slate-400 mb-1 font-semibold">Mersis No (İsteğe Bağlı)</label>
+              <input type="text" id="inputCompMersisNo" placeholder="İsteğe bağlı" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500">
             </div>
           </div>
         </div>
@@ -1920,11 +1920,11 @@ a { color: inherit; text-decoration: inherit; }
         <!-- 4. Yetkili & Fiş Alt Notu -->
         <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2.5">
           <h4 class="font-bold text-amber-400 text-xs flex items-center gap-1.5 border-b border-slate-800 pb-1.5">
-            <span>✍️</span> Yetkili & Fiş Garanti Notu
+            <span>✍️</span> Firma Sahibi / Yetkili & Fiş Alt Notu
           </h4>
           <div>
-            <label class="block text-slate-400 mb-1 font-semibold">Teknik Servis Müdürü / Baş Teknisyen Adı</label>
-            <input type="text" id="inputCompManager" placeholder="Örn: İsmail İnanır (Genel Koordinatör)" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500">
+            <label class="block text-slate-400 mb-1 font-semibold">Firma Sahibi / Yetkili Adı</label>
+            <input type="text" id="inputCompManager" placeholder="Örn: Kemal Deniz İnanır" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500">
           </div>
           <div>
             <label class="block text-slate-400 mb-1 font-semibold">Fiş Alt Bilgilendirme & Garanti Notu</label>
@@ -30210,19 +30210,19 @@ a { color: inherit; text-decoration: inherit; }
     ];
 
     const DEFAULT_COMPANY_INFO = {
-      name: "İnanır Kule Vinç San. ve Tic. Ltd. Şti.",
+      name: "İNANIR KULE VİNÇ - KEMAL DENİZ İNANIR",
       shortName: "İNANIR KULE VİNÇ",
       slogan: "Kule Vinç Montaj, Demontaj, Saha Servisi & Elektronik Teşhis",
-      address: "İkitelli OSB Mah. Demirciler Sanayi Sitesi 12. Cadde No: 48, Başakşehir / İstanbul",
-      phone: "0 (212) 671 45 45",
-      gsm: "0 (532) 789 10 20",
+      address: "Güneşli Mah. 1365. Sk. Altuntaş Apt. No: 18/2 Bağcılar / İstanbul",
+      phone: "",
+      gsm: "",
       email: "servis@inanirkulevinc.com",
       website: "www.inanirkulevinc.com",
-      taxOffice: "İkitelli Vergi Dairesi",
-      taxNo: "478 045 8912",
-      tradeRegNo: "945120-5",
-      mersisNo: "0478045891200001",
-      serviceManager: "İsmail İnanır (Genel Koordinatör)",
+      taxOffice: "Güneşli V.D.",
+      taxNo: "24530450654",
+      tradeRegNo: "İ.T.O - 410938-5",
+      mersisNo: "",
+      serviceManager: "Kemal Deniz İnanır",
       notes: "7/24 Acil Saha Müdahale & Orijinal Yedek Parça Güvencesi"
     };
 
@@ -30465,6 +30465,7 @@ a { color: inherit; text-decoration: inherit; }
             store.drives = parsed.drives;
             store.serviceForms = (parsed.serviceForms && parsed.serviceForms.length > 0) ? parsed.serviceForms : SAMPLE_SERVICE_FORMS;
             store.companyInfo = parsed.companyInfo || DEFAULT_COMPANY_INFO;
+            store.companyInfoUpdatedAt = parsed.companyInfoUpdatedAt || 0;
             store.machines = (parsed.machines && parsed.machines.length > 0) ? parsed.machines : SAMPLE_MACHINES;
           } else {
             store.brands = JSON.parse(JSON.stringify(CRANE_DATA));
@@ -30479,6 +30480,18 @@ a { color: inherit; text-decoration: inherit; }
           store.companyInfo = DEFAULT_COMPANY_INFO;
           store.machines = SAMPLE_MACHINES;
         }
+        try {
+          const savedUserComp = localStorage.getItem('InanirKuleVinc_UserCompanyInfo_v1');
+          if (savedUserComp) {
+            const parsedUserComp = JSON.parse(savedUserComp);
+            if (parsedUserComp && parsedUserComp.data && parsedUserComp.data.name) {
+              if (!store.companyInfoUpdatedAt || (parsedUserComp.updatedAt || 0) >= (store.companyInfoUpdatedAt || 0)) {
+                store.companyInfo = parsedUserComp.data;
+                store.companyInfoUpdatedAt = parsedUserComp.updatedAt || Date.now();
+              }
+            }
+          }
+        } catch (e) {}
         mergeWithDefaultLibraries();
         try { localStorage.removeItem('InanirKuleVinc_Store_v9'); } catch(e) {}
         saveStore(false);
@@ -30747,13 +30760,12 @@ a { color: inherit; text-decoration: inherit; }
         }
       });
 
-      const isCompanyModified = JSON.stringify(store.companyInfo) !== JSON.stringify(DEFAULT_COMPANY_INFO);
-
       return {
         ts: Date.now(),
         deviceId: cloudSyncConfig.deviceId,
         roomCode: cloudSyncConfig.roomCode,
-        companyInfo: isCompanyModified ? store.companyInfo : null,
+        companyInfo: store.companyInfo || DEFAULT_COMPANY_INFO,
+        companyInfoUpdatedAt: store.companyInfoUpdatedAt || 0,
         machines: userMachines,
         serviceForms: userServiceForms,
         deletedIds: Array.from(new Set(deletedSampleIds)),
@@ -30876,10 +30888,21 @@ a { color: inherit; text-decoration: inherit; }
       }
 
       if (payload.companyInfo && payload.companyInfo.name) {
-        if (JSON.stringify(store.companyInfo) !== JSON.stringify(payload.companyInfo)) {
-          store.companyInfo = payload.companyInfo;
-          applyCompanyInfoToUI();
-          changed = true;
+        const remoteCompTs = Number(payload.companyInfoUpdatedAt || 0);
+        const localCompTs = Number(store.companyInfoUpdatedAt || 0);
+        if (remoteCompTs > 0 && remoteCompTs > localCompTs) {
+          if (JSON.stringify(store.companyInfo) !== JSON.stringify(payload.companyInfo)) {
+            store.companyInfo = payload.companyInfo;
+            store.companyInfoUpdatedAt = remoteCompTs;
+            try {
+              localStorage.setItem('InanirKuleVinc_UserCompanyInfo_v1', JSON.stringify({
+                data: store.companyInfo,
+                updatedAt: remoteCompTs
+              }));
+            } catch (e) {}
+            applyCompanyInfoToUI();
+            changed = true;
+          }
         }
       }
 
@@ -31307,10 +31330,20 @@ a { color: inherit; text-decoration: inherit; }
             saveCloudSyncConfig();
           }
           payloads.sort((a, b) => a.ts - b.ts);
+          const lastProcessedTs = Number(cloudSyncConfig.lastProcessedPayloadTs || 0);
+          let maxSeenTs = lastProcessedTs;
           for (const p of payloads) {
+            const pTs = Number(p.ts || 0);
+            if (!manual && lastProcessedTs > 0 && pTs <= lastProcessedTs) {
+              continue;
+            }
+            if (pTs > maxSeenTs) maxSeenTs = pTs;
             if (mergeIncomingCloudPayload(p, false)) {
               anyUpdated = true;
             }
+          }
+          if (maxSeenTs > lastProcessedTs) {
+            cloudSyncConfig.lastProcessedPayloadTs = maxSeenTs;
           }
         }
 
@@ -31318,7 +31351,7 @@ a { color: inherit; text-decoration: inherit; }
         saveCloudSyncConfig();
         updateCloudSyncUIStatus('Bağlı & Eşitlendi', false);
 
-        if (anyUpdated) {
+        if (anyUpdated && manual) {
           showToast('☁️ Buluttaki yeni servis fişleri, şemalar ve makineler eşitlendi!');
           return true;
         }
@@ -31390,7 +31423,12 @@ a { color: inherit; text-decoration: inherit; }
             }
             const payload = await extractPayloadFromNtfyMessage(data);
             if (payload && payload.deviceId !== cloudSyncConfig.deviceId) {
-              mergeIncomingCloudPayload(payload, true);
+              const pTs = Number(payload.ts || 0);
+              if (pTs > Number(cloudSyncConfig.lastProcessedPayloadTs || 0)) {
+                cloudSyncConfig.lastProcessedPayloadTs = pTs;
+                saveCloudSyncConfig();
+              }
+              mergeIncomingCloudPayload(payload, false);
             }
           } catch (e) {}
         };
@@ -31465,7 +31503,8 @@ a { color: inherit; text-decoration: inherit; }
           drives: store.drives,
           serviceForms: store.serviceForms,
           machines: store.machines,
-          companyInfo: store.companyInfo
+          companyInfo: store.companyInfo,
+          companyInfoUpdatedAt: store.companyInfoUpdatedAt || 0
         };
         localStorage.setItem('InanirKuleVinc_Store_v11', JSON.stringify(lightStore));
       } catch (e) {
@@ -34433,9 +34472,9 @@ let toastHideTimer = null;
                 İKV
               </div>
               <div>
-                <h1 style="font-size: 16px; font-weight: 900; letter-spacing: -0.2px; text-transform: uppercase; color: #0f172a; margin: 0;">${comp.shortName || comp.name}</h1>
-                <p style="font-size: 9.5px; color: #334155; margin: 2px 0;">${comp.address || ''} • Tel: <strong style="color: #0f172a;">${comp.gsm || comp.phone || ''}</strong></p>
-                <p style="font-size: 8.5px; color: #64748b; font-family: monospace; margin: 1px 0;">V.D: ${comp.taxOffice || ''} • Vergi No: ${comp.taxNo || ''}</p>
+                <h1 style="font-size: 15.5px; font-weight: 900; letter-spacing: -0.2px; text-transform: uppercase; color: #0f172a; margin: 0;">${comp.name || comp.shortName}</h1>
+                <p style="font-size: 9.5px; color: #334155; margin: 2px 0;">${comp.address || ''}${(comp.gsm || comp.phone) ? ' • Tel: <strong style="color: #0f172a;">' + (comp.gsm || comp.phone) + '</strong>' : ''}</p>
+                <p style="font-size: 8.5px; color: #64748b; font-family: monospace; margin: 1px 0;">${comp.taxOffice || 'Güneşli V.D.'} • TC / Vergi No: ${comp.taxNo || '24530450654'}${comp.tradeRegNo ? ' • ' + comp.tradeRegNo : ''}</p>
               </div>
             </div>
             <div style="text-align: right; flex-shrink: 0;">
@@ -34557,7 +34596,7 @@ let toastHideTimer = null;
 
           <!-- 8. ALT BİLGİ -->
           <div style="text-align: center; font-size: 8px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 5px; margin-top: 8px;">
-            ${comp.name} • Tel: <strong>${comp.gsm || comp.phone || ''}</strong> • ${comp.website || ''}
+            ${comp.name} • ${comp.address || ''} • ${comp.taxOffice || ''} TC: ${comp.taxNo || ''}${comp.tradeRegNo ? ' • ' + comp.tradeRegNo : ''}${(comp.gsm || comp.phone) ? ' • Tel: <strong>' + (comp.gsm || comp.phone) + '</strong>' : ''}
           </div>
         </div>
       `;
@@ -34713,16 +34752,18 @@ let toastHideTimer = null;
 
       ctx.textAlign = 'left';
       ctx.fillStyle = '#0f172a';
-      ctx.font = `900 28px ${fontSans}`;
-      ctx.fillText((comp.shortName || comp.name || 'İNANIR KULE VİNÇ').toUpperCase(), marginX + 90, curY + 28);
+      ctx.font = `900 23px ${fontSans}`;
+      ctx.fillText((comp.name || comp.shortName || 'İNANIR KULE VİNÇ - KEMAL DENİZ İNANIR').toUpperCase(), marginX + 90, curY + 28);
 
       ctx.fillStyle = '#334155';
-      ctx.font = `600 15px ${fontSans}`;
-      ctx.fillText(`${comp.address || ''} • Tel: ${comp.gsm || comp.phone || ''}`, marginX + 90, curY + 52);
+      ctx.font = `600 14.5px ${fontSans}`;
+      const telPart = (comp.gsm || comp.phone) ? ` • Tel: ${comp.gsm || comp.phone}` : '';
+      ctx.fillText(`${comp.address || ''}${telPart}`, marginX + 90, curY + 52);
 
       ctx.fillStyle = '#64748b';
-      ctx.font = `600 14px ${fontMono}`;
-      ctx.fillText(`Vergi Dairesi: ${comp.taxOffice || '-'} • Vergi No: ${comp.taxNo || '-'}`, marginX + 90, curY + 72);
+      ctx.font = `600 13.5px ${fontMono}`;
+      const regPart = comp.tradeRegNo ? ` • ${comp.tradeRegNo}` : '';
+      ctx.fillText(`${comp.taxOffice || 'Güneşli V.D.'} • TC / Vergi No: ${comp.taxNo || '24530450654'}${regPart}`, marginX + 90, curY + 72);
 
       // Sağ Üst Fiş Kutusu
       const badgeW = 250;
@@ -35027,8 +35068,9 @@ let toastHideTimer = null;
       ctx.stroke();
 
       ctx.fillStyle = '#64748b';
-      ctx.font = `600 13.5px ${fontSans}`;
-      ctx.fillText(`${comp.name || ''} • Tel: ${comp.gsm || comp.phone || ''} • ${comp.website || ''}`, marginX + contentW / 2, footerY);
+      ctx.font = `600 13px ${fontSans}`;
+      const footerTel = (comp.gsm || comp.phone) ? ` • Tel: ${comp.gsm || comp.phone}` : '';
+      ctx.fillText(`${comp.name || ''} • ${comp.address || ''} • ${comp.taxOffice || ''} TC: ${comp.taxNo || ''}${comp.tradeRegNo ? ' • ' + comp.tradeRegNo : ''}${footerTel}`, marginX + contentW / 2, footerY);
       ctx.textAlign = 'left';
 
       return canvas;
@@ -35275,15 +35317,31 @@ let toastHideTimer = null;
         notes: document.getElementById('inputCompNotes').value.trim()
       };
 
-      saveStore();
+      store.companyInfoUpdatedAt = Date.now();
+      try {
+        localStorage.setItem('InanirKuleVinc_UserCompanyInfo_v1', JSON.stringify({
+          data: store.companyInfo,
+          updatedAt: store.companyInfoUpdatedAt
+        }));
+      } catch (e) {}
+      saveStore(false);
+      pushStoreToCloud(false);
       applyCompanyInfoToUI();
       closeCompanySettingsModal();
-      showToast('Firma bilgileriniz başarıyla güncellendi!');
+      showToast('Firma bilgileriniz kalıcı olarak kaydedildi!');
     }
 
     function resetCompanySettingsToDefault() {
       store.companyInfo = Object.assign({}, DEFAULT_COMPANY_INFO);
-      saveStore();
+      store.companyInfoUpdatedAt = Date.now();
+      try {
+        localStorage.setItem('InanirKuleVinc_UserCompanyInfo_v1', JSON.stringify({
+          data: store.companyInfo,
+          updatedAt: store.companyInfoUpdatedAt
+        }));
+      } catch (e) {}
+      saveStore(false);
+      pushStoreToCloud(false);
       applyCompanyInfoToUI();
       openCompanySettingsModal();
       showToast('Firma bilgileri varsayılana sıfırlandı!');
@@ -35303,8 +35361,23 @@ let toastHideTimer = null;
             if (Array.isArray(idbData.drives)) store.drives = idbData.drives;
             if (idbData.serviceForms && idbData.serviceForms.length >= (store.serviceForms || []).length) store.serviceForms = idbData.serviceForms;
             if (idbData.machines && idbData.machines.length >= (store.machines || []).length) store.machines = idbData.machines;
-            if (idbData.companyInfo) store.companyInfo = idbData.companyInfo;
-            mergeWithDefaultLibraries();
+            if (idbData.companyInfo && (!store.companyInfoUpdatedAt || (idbData.companyInfoUpdatedAt || 0) > (store.companyInfoUpdatedAt || 0))) {
+              store.companyInfo = idbData.companyInfo;
+              store.companyInfoUpdatedAt = idbData.companyInfoUpdatedAt || store.companyInfoUpdatedAt || 0;
+            }
+            try {
+          const savedUserComp = localStorage.getItem('InanirKuleVinc_UserCompanyInfo_v1');
+          if (savedUserComp) {
+            const parsedUserComp = JSON.parse(savedUserComp);
+            if (parsedUserComp && parsedUserComp.data && parsedUserComp.data.name) {
+              if (!store.companyInfoUpdatedAt || (parsedUserComp.updatedAt || 0) >= (store.companyInfoUpdatedAt || 0)) {
+                store.companyInfo = parsedUserComp.data;
+                store.companyInfoUpdatedAt = parsedUserComp.updatedAt || Date.now();
+              }
+            }
+          }
+        } catch (e) {}
+        mergeWithDefaultLibraries();
             applyCompanyInfoToUI();
             renderBrands(document.getElementById('inputBrandSearch')?.value || '');
             if (!document.getElementById('viewModelList').classList.contains('hidden')) renderModels();
@@ -35320,7 +35393,7 @@ let toastHideTimer = null;
             navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
           }
           if ('caches' in window && (location.protocol === 'https:' || location.protocol === 'http:')) {
-            const cache = await caches.open('ikv-offline-v15');
+            const cache = await caches.open('ikv-offline-v16');
             const fullHtml = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
             const resp1 = new Response(fullHtml, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
             const resp2 = new Response(fullHtml, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
@@ -36248,6 +36321,18 @@ let toastHideTimer = null;
           } catch (e) {}
         }
         store = imported;
+        try {
+          const savedUserComp = localStorage.getItem('InanirKuleVinc_UserCompanyInfo_v1');
+          if (savedUserComp) {
+            const parsedUserComp = JSON.parse(savedUserComp);
+            if (parsedUserComp && parsedUserComp.data && parsedUserComp.data.name) {
+              if (!store.companyInfoUpdatedAt || (parsedUserComp.updatedAt || 0) >= (store.companyInfoUpdatedAt || 0)) {
+                store.companyInfo = parsedUserComp.data;
+                store.companyInfoUpdatedAt = parsedUserComp.updatedAt || Date.now();
+              }
+            }
+          }
+        } catch (e) {}
         mergeWithDefaultLibraries();
         saveStore();
         renderBrands();
