@@ -2215,6 +2215,10 @@ a { color: inherit; text-decoration: inherit; }
           </p>
 
           <!-- Hızlı Senkronizasyon Butonları -->
+          <button type="button" id="btnFullTwoWaySyncNow" class="w-full bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 font-black py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-lg active:scale-95 text-xs sm:text-sm">
+            <span>⚡</span>
+            <span>Şimdi Tüm Cihazlarla Eşitle (Görseller, PDF &amp; Kayıtlar)</span>
+          </button>
           <div class="grid grid-cols-2 gap-2 pt-1">
             <button id="btnPullCloudNow" class="bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-500/30 font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95">
               <span>🔄</span>
@@ -30315,6 +30319,13 @@ a { color: inherit; text-decoration: inherit; }
       });
       saveCloudSyncConfig();
 
+      const removedMediaIds = [];
+      (brand.models || []).forEach(m => {
+        if (m.id === modelId || (targetNameLower && (m.name || '').toLowerCase().trim() === targetNameLower)) {
+          (m.media || []).forEach(med => { if (med && med.id) removedMediaIds.push(med.id); });
+        }
+      });
+      syncDeletedIdsToCloud([modelId, modKey, ...removedMediaIds], removedMediaIds);
       brand.models = (brand.models || []).filter(m => m.id !== modelId && (!targetNameLower || (m.name || '').toLowerCase().trim() !== targetNameLower));
       saveStore(false);
       pushStoreToCloud(false);
@@ -30350,6 +30361,11 @@ a { color: inherit; text-decoration: inherit; }
       });
       saveCloudSyncConfig();
 
+      const removedBrandMediaIds = [];
+      (brand.models || []).forEach(m => {
+        (m.media || []).forEach(med => { if (med && med.id) removedBrandMediaIds.push(med.id); });
+      });
+      syncDeletedIdsToCloud([brandId, brandKey, ...removedBrandMediaIds], removedBrandMediaIds);
       store.brands = store.brands.filter(b => b.id !== brandId);
       saveStore(false);
       pushStoreToCloud(false);
@@ -30794,15 +30810,324 @@ a { color: inherit; text-decoration: inherit; }
     }
 
     function getCandidateRoomTopics() {
-      const raw = (cloudSyncConfig.roomCode || 'INANIR-VINC-MERKEZ').trim();
-      const normalized = normalizeTurkishCode(raw).replace(/[^A-Z0-9_-]/g, '') || 'INANIR-VINC-MERKEZ';
+      const raw = (cloudSyncConfig.roomCode || 'İK52').trim();
+      const normalized = normalizeTurkishCode(raw).replace(/[^A-Z0-9_-]/g, '') || 'IK52';
       const legacy = raw.toUpperCase().replace(/[^A-Z0-9_-]/g, '') || normalized;
-      const topics = ['ikv_sync_v11_' + normalized.toLowerCase()];
+      const topics = [
+        'ikv_sync_v11_' + normalized.toLowerCase(),
+        'ikv_sync_v11_ik52',
+        'ikv_sync_v11_inanir-vinc-merkez'
+      ];
       if (legacy.toLowerCase() !== normalized.toLowerCase()) {
         topics.push('ikv_sync_v11_' + legacy.toLowerCase());
       }
       topics.push('ikv_bak_v12_' + normalized.toLowerCase());
       return Array.from(new Set(topics));
+    }
+
+    // ============================================================================
+    // ATOMİK BULUT MEDYA VE SİLİNENLER KAYIT DEFTERİ (FIREBASE RTDB PATCH DESTEKLİ)
+    // Her fotoğraf ve PDF kendi benzersiz ID'si ile kaydedilir; hiçbir cihaz diğerinin
+    // yüklediği görseli veya PDF'i ezmez, tüm cihazlarda anında görünür!
+    // ============================================================================
+    function getFirebaseBaseOrDefault() {
+      return sanitizeFirebaseBaseUrl(cloudSyncConfig.customFirebaseUrl || DEFAULT_FIREBASE_URL);
+    }
+
+    async function generateCompactThumbFromDataUrl(dataUrl, maxW = 750, quality = 0.74) {
+      if (!dataUrl || !dataUrl.startsWith('data:image/')) return '';
+      if (dataUrl.startsWith('data:image/svg')) return dataUrl;
+      return new Promise((resolve) => {
+        const tempImg = new Image();
+        tempImg.onload = () => {
+          try {
+            const scale = Math.min(1, maxW / (tempImg.naturalWidth || maxW));
+            const c = document.createElement('canvas');
+            c.width = Math.max(1, Math.floor((tempImg.naturalWidth || maxW) * scale));
+            c.height = Math.max(1, Math.floor((tempImg.naturalHeight || 600) * scale));
+            const ctx = c.getContext('2d');
+            ctx.drawImage(tempImg, 0, 0, c.width, c.height);
+            resolve(c.toDataURL('image/jpeg', quality));
+          } catch (e) {
+            resolve('');
+          }
+        };
+        tempImg.onerror = () => resolve('');
+        tempImg.src = dataUrl;
+      });
+    }
+
+    function buildCloudMediaRegistryEntry(med, brand, model) {
+      if (!med || !med.id || med.id === 'med-p1') return null;
+      let thumb = med.thumbData || '';
+      if (!thumb && med.type !== 'pdf' && med.data && med.data.startsWith('data:image/') && med.data.length < 250000) {
+        thumb = med.data;
+      }
+      return {
+        id: med.id,
+        title: med.title || 'Saha Belgesi',
+        category: med.category || (med.type === 'pdf' ? 'electronic' : 'balance'),
+        type: med.type || 'image',
+        date: med.date || new Date().toLocaleDateString('tr-TR'),
+        notes: med.notes || '',
+        externalUrl: med.externalUrl || '',
+        cloudBlobUrl: med.cloudBlobUrl || '',
+        thumbData: thumb,
+        brandId: brand ? brand.id : (med.brandId || ''),
+        brandName: brand ? brand.name : (med.brandName || ''),
+        brandCountry: brand ? (brand.country || '') : '',
+        modelId: model ? model.id : (med.modelId || ''),
+        modelName: model ? model.name : (med.modelName || ''),
+        maxCapacityTons: model ? (model.maxCapacityTons || 8) : 8,
+        jibLengthMeters: model ? (model.jibLengthMeters || 60) : 60,
+        tipLoadTons: model ? (model.tipLoadTons || 1.5) : 1.5,
+        modelDesc: model ? (model.description || '') : '',
+        updatedAt: Date.now()
+      };
+    }
+
+    async function pushSingleMediaItemToCloudRegistry(med, brand, model) {
+      if (!med || !med.id || med.id === 'med-p1') return false;
+      const fbBase = getFirebaseBaseOrDefault();
+      if (!fbBase || !fbBase.startsWith('http')) return false;
+      try {
+        if (med.type !== 'pdf' && !med.thumbData) {
+          if (med.data && med.data.startsWith('data:image/')) {
+            med.thumbData = await generateCompactThumbFromDataUrl(med.data, 750, 0.74);
+          } else {
+            const idbBlob = await getMediaBlobFromIDB(med.id);
+            if (idbBlob) {
+              const dUrl = await blobToDataUrl(idbBlob);
+              if (dUrl) med.thumbData = await generateCompactThumbFromDataUrl(dUrl, 750, 0.74);
+            }
+          }
+        }
+        const entry = buildCloudMediaRegistryEntry(med, brand, model);
+        if (!entry) return false;
+        const primaryTopic = getCandidateRoomTopics()[0];
+        const bodyStr = JSON.stringify(entry);
+        const [r1, r2] = await Promise.allSettled([
+          fetchWithTimeout(`${fbBase}/ikv_media_registry_v1/${med.id}.json`, { method: 'PUT', body: bodyStr }, 8000),
+          fetchWithTimeout(`${fbBase}/${primaryTopic}_media/${med.id}.json`, { method: 'PUT', body: bodyStr }, 8000)
+        ]);
+        return (r1.status === 'fulfilled' && r1.value && r1.value.ok) || (r2.status === 'fulfilled' && r2.value && r2.value.ok);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function pushAllLocalMediaItemsToCloudRegistry() {
+      const fbBase = getFirebaseBaseOrDefault();
+      if (!fbBase || !fbBase.startsWith('http')) return false;
+      const deletedSet = new Set(cloudSyncConfig.deletedIds || []);
+      const patchMap = {};
+      let count = 0;
+
+      for (const b of (store.brands || [])) {
+        if (!b || deletedSet.has(b.id) || deletedSet.has(getDeletedBrandKey(b.name))) continue;
+        for (const m of (b.models || [])) {
+          if (!m || deletedSet.has(m.id) || deletedSet.has(getDeletedModelKey(b.id, m.name))) continue;
+          for (const med of (m.media || [])) {
+            if (!med || !med.id || med.id === 'med-p1' || deletedSet.has(med.id)) continue;
+            if (med.type !== 'pdf' && !med.thumbData) {
+              if (med.data && med.data.startsWith('data:image/')) {
+                med.thumbData = await generateCompactThumbFromDataUrl(med.data, 750, 0.74);
+              } else {
+                const idbBlob = await getMediaBlobFromIDB(med.id);
+                if (idbBlob) {
+                  const dUrl = await blobToDataUrl(idbBlob);
+                  if (dUrl) med.thumbData = await generateCompactThumbFromDataUrl(dUrl, 750, 0.74);
+                }
+              }
+            }
+            const entry = buildCloudMediaRegistryEntry(med, b, m);
+            if (entry) {
+              patchMap[med.id] = entry;
+              count++;
+            }
+          }
+        }
+      }
+
+      if (count === 0) return true;
+      try {
+        const primaryTopic = getCandidateRoomTopics()[0];
+        const bodyStr = JSON.stringify(patchMap);
+        await Promise.allSettled([
+          fetchWithTimeout(`${fbBase}/ikv_media_registry_v1.json`, { method: 'PATCH', body: bodyStr }, 10000),
+          fetchWithTimeout(`${fbBase}/${primaryTopic}_media.json`, { method: 'PATCH', body: bodyStr }, 10000)
+        ]);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function syncDeletedIdsToCloud(idsToDelete = [], mediaIdsToRemove = []) {
+      const fbBase = getFirebaseBaseOrDefault();
+      if (!fbBase || !fbBase.startsWith('http')) return;
+      try {
+        const primaryTopic = getCandidateRoomTopics()[0];
+        const allDel = Array.from(new Set([...(cloudSyncConfig.deletedIds || []), ...idsToDelete]));
+        if (allDel.length > 0) {
+          const delMap = {};
+          allDel.forEach(id => {
+            const safeKey = String(id || '').replace(/[.#$/\[\]]/g, '_');
+            if (safeKey) delMap[safeKey] = id;
+          });
+          fetchWithTimeout(`${fbBase}/ikv_deleted_ids_v1.json`, {
+            method: 'PATCH',
+            body: JSON.stringify(delMap)
+          }, 6000).catch(() => {});
+        }
+        for (const mid of mediaIdsToRemove) {
+          if (!mid) continue;
+          fetchWithTimeout(`${fbBase}/ikv_media_registry_v1/${mid}.json`, { method: 'DELETE' }, 5000).catch(() => {});
+          fetchWithTimeout(`${fbBase}/${primaryTopic}_media/${mid}.json`, { method: 'DELETE' }, 5000).catch(() => {});
+        }
+      } catch (e) {}
+    }
+
+    async function pullAndMergeCloudMediaRegistry() {
+      const fbBase = getFirebaseBaseOrDefault();
+      if (!fbBase || !fbBase.startsWith('http')) return false;
+      const primaryTopic = getCandidateRoomTopics()[0];
+      let anyChanged = false;
+
+      try {
+        const [delRes, globalMedRes, roomMedRes] = await Promise.allSettled([
+          fetchWithTimeout(`${fbBase}/ikv_deleted_ids_v1.json`, {}, 5500),
+          fetchWithTimeout(`${fbBase}/ikv_media_registry_v1.json`, {}, 6500),
+          fetchWithTimeout(`${fbBase}/${primaryTopic}_media.json`, {}, 6500)
+        ]);
+
+        const deletedSet = new Set(cloudSyncConfig.deletedIds || []);
+        if (delRes.status === 'fulfilled' && delRes.value && delRes.value.ok) {
+          const delObj = await delRes.value.json();
+          if (delObj && typeof delObj === 'object') {
+            Object.values(delObj).forEach(val => {
+              if (typeof val === 'string' && val) deletedSet.add(val);
+            });
+            Object.keys(delObj).forEach(k => {
+              if (k) deletedSet.add(k);
+            });
+          }
+        }
+        if (deletedSet.size !== (cloudSyncConfig.deletedIds || []).length) {
+          cloudSyncConfig.deletedIds = Array.from(deletedSet);
+          saveCloudSyncConfig();
+        }
+
+        const combinedMediaMap = {};
+        if (roomMedRes.status === 'fulfilled' && roomMedRes.value && roomMedRes.value.ok) {
+          const rMap = await roomMedRes.value.json();
+          if (rMap && typeof rMap === 'object') Object.assign(combinedMediaMap, rMap);
+        }
+        if (globalMedRes.status === 'fulfilled' && globalMedRes.value && globalMedRes.value.ok) {
+          const gMap = await globalMedRes.value.json();
+          if (gMap && typeof gMap === 'object') Object.assign(combinedMediaMap, gMap);
+        }
+
+        const mediaEntries = Object.values(combinedMediaMap).filter(x => x && typeof x === 'object' && x.id);
+        if (mediaEntries.length > 0) {
+          // Sort oldest to newest so unshift puts newest at the top
+          mediaEntries.sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0));
+
+          for (const entry of mediaEntries) {
+            if (!entry || !entry.id || deletedSet.has(entry.id)) continue;
+            const bKey = entry.brandName ? getDeletedBrandKey(entry.brandName) : '';
+            const mKey = (entry.brandId && entry.modelName) ? getDeletedModelKey(entry.brandId, entry.modelName) : '';
+            if ((entry.brandId && deletedSet.has(entry.brandId)) || (bKey && deletedSet.has(bKey))) continue;
+            if ((entry.modelId && deletedSet.has(entry.modelId)) || (mKey && deletedSet.has(mKey))) continue;
+
+            // 1. Hedef markayı bul veya oluştur
+            let targetBrand = (store.brands || []).find(b =>
+              (entry.brandId && b.id === entry.brandId) ||
+              (entry.brandName && normalizeBrandModelMatchKey(b.name) === normalizeBrandModelMatchKey(entry.brandName))
+            );
+            if (!targetBrand && entry.brandName) {
+              targetBrand = {
+                id: entry.brandId || ('b-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5)),
+                name: entry.brandName,
+                country: entry.brandCountry || 'Kule Vinç',
+                models: []
+              };
+              store.brands.push(targetBrand);
+              anyChanged = true;
+            }
+            if (!targetBrand) continue;
+
+            // 2. Hedef modeli bul veya oluştur
+            if (!Array.isArray(targetBrand.models)) targetBrand.models = [];
+            const targetModDelKey = getDeletedModelKey(targetBrand.id, entry.modelName || '');
+            if (targetModDelKey && deletedSet.has(targetModDelKey)) continue;
+
+            let targetModel = targetBrand.models.find(m =>
+              (entry.modelId && m.id === entry.modelId) ||
+              (entry.modelName && normalizeBrandModelMatchKey(m.name) === normalizeBrandModelMatchKey(entry.modelName))
+            );
+            if (!targetModel && entry.modelName) {
+              targetModel = {
+                id: entry.modelId || ('m-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5)),
+                name: entry.modelName,
+                maxCapacityTons: entry.maxCapacityTons || 8,
+                jibLengthMeters: entry.jibLengthMeters || 60,
+                tipLoadTons: entry.tipLoadTons || 1.5,
+                description: entry.modelDesc || '',
+                media: [],
+                codes: []
+              };
+              targetBrand.models.push(targetModel);
+              anyChanged = true;
+            }
+            if (!targetModel) continue;
+
+            // 3. Medya öğesini modele ekle veya güncelle
+            if (!Array.isArray(targetModel.media)) targetModel.media = [];
+            const existingMed = targetModel.media.find(x => x.id === entry.id);
+            if (!existingMed) {
+              const newMedObj = {
+                id: entry.id,
+                title: entry.title || 'Saha Belgesi',
+                category: entry.category || (entry.type === 'pdf' ? 'electronic' : 'balance'),
+                type: entry.type || 'image',
+                data: entry.externalUrl ? entry.externalUrl : (entry.thumbData && entry.type !== 'pdf' ? entry.thumbData : ('idb://' + entry.id)),
+                thumbData: entry.thumbData || '',
+                cloudBlobUrl: entry.cloudBlobUrl || '',
+                externalUrl: entry.externalUrl || '',
+                date: entry.date || '',
+                notes: entry.notes || ''
+              };
+              targetModel.media.unshift(newMedObj);
+              anyChanged = true;
+            } else {
+              if (entry.title && existingMed.title !== entry.title) { existingMed.title = entry.title; anyChanged = true; }
+              if (entry.notes && existingMed.notes !== entry.notes) { existingMed.notes = entry.notes; anyChanged = true; }
+              if (entry.cloudBlobUrl && existingMed.cloudBlobUrl !== entry.cloudBlobUrl) { existingMed.cloudBlobUrl = entry.cloudBlobUrl; anyChanged = true; }
+              if (entry.externalUrl && existingMed.externalUrl !== entry.externalUrl) { existingMed.externalUrl = entry.externalUrl; anyChanged = true; }
+              if (entry.thumbData && !existingMed.thumbData) {
+                existingMed.thumbData = entry.thumbData;
+                if (!existingMed.data || existingMed.data.startsWith('idb://')) {
+                  existingMed.data = entry.thumbData;
+                }
+                anyChanged = true;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Cloud media registry okuma uyarısı:', e);
+      }
+
+      if (anyChanged) {
+        isSyncingFromCloud = true;
+        saveStore(false);
+        isSyncingFromCloud = false;
+        renderBrands(document.getElementById('inputBrandSearch')?.value || '');
+        if (!document.getElementById('viewModelList').classList.contains('hidden')) renderModels();
+        if (!document.getElementById('viewModelDetail').classList.contains('hidden')) renderModelDetail();
+      }
+      return anyChanged;
     }
 
     async function fetchWithTimeout(url, options = {}, timeoutMs = 4200) {
@@ -30818,7 +31143,7 @@ a { color: inherit; text-decoration: inherit; }
       }
     }
 
-    function buildCompactSyncPayload() {
+    function buildCompactSyncPayload(includeThumbs = true) {
       const sampleFormMap = new Map(SAMPLE_SERVICE_FORMS.map(s => [s.id, JSON.stringify(s)]));
       const sampleMacMap = new Map(SAMPLE_MACHINES.map(m => [m.id, JSON.stringify(m)]));
 
@@ -30865,19 +31190,28 @@ a { color: inherit; text-decoration: inherit; }
 
       function serializeSyncMediaItem(med) {
         if (!med || !med.id) return null;
+        let thumb = '';
+        if (includeThumbs) {
+          thumb = med.thumbData || '';
+          if (!thumb && med.type !== 'pdf' && med.data && med.data.startsWith('data:image/') && med.data.length < 220000) {
+            thumb = med.data;
+          }
+        }
         const copy = {
           id: med.id,
           title: med.title || 'Belge',
-          category: med.category || 'electronic',
+          category: med.category || (med.type === 'pdf' ? 'electronic' : 'balance'),
           type: med.type || 'pdf',
           date: med.date || '',
           notes: med.notes || '',
           externalUrl: med.externalUrl || '',
           cloudBlobUrl: med.cloudBlobUrl || '',
-          thumbData: med.thumbData || ''
+          thumbData: thumb
         };
         if (med.externalUrl) {
           copy.data = med.externalUrl;
+        } else if (includeThumbs && thumb && med.type !== 'pdf') {
+          copy.data = thumb;
         } else {
           copy.data = 'idb://' + med.id;
         }
@@ -31124,7 +31458,13 @@ a { color: inherit; text-decoration: inherit; }
             if (rMed.notes && existingMed.notes !== rMed.notes) { existingMed.notes = rMed.notes; mediaChanged = true; }
             if (rMed.externalUrl && existingMed.externalUrl !== rMed.externalUrl) { existingMed.externalUrl = rMed.externalUrl; mediaChanged = true; }
             if (rMed.cloudBlobUrl && existingMed.cloudBlobUrl !== rMed.cloudBlobUrl) { existingMed.cloudBlobUrl = rMed.cloudBlobUrl; mediaChanged = true; }
-            if (rMed.thumbData && !existingMed.thumbData) { existingMed.thumbData = rMed.thumbData; mediaChanged = true; }
+            if (rMed.thumbData && !existingMed.thumbData) {
+              existingMed.thumbData = rMed.thumbData;
+              if (existingMed.type !== 'pdf' && (!existingMed.data || existingMed.data.startsWith('idb://'))) {
+                existingMed.data = rMed.thumbData;
+              }
+              mediaChanged = true;
+            }
           }
         }
         return mediaChanged;
@@ -31321,34 +31661,61 @@ a { color: inherit; text-decoration: inherit; }
         btnPush.innerHTML = '<span>⏳</span><span>Gönderiliyor...</span>';
       }
 
-      const payload = buildCompactSyncPayload();
       const topics = getCandidateRoomTopics();
       const primaryTopic = topics[0];
-      const bodyStr = JSON.stringify(payload);
+      const fbBase = getFirebaseBaseOrDefault();
       let pushedOk = false;
 
       try {
         updateCloudSyncUIStatus('Gönderiliyor...');
 
+        // 0. Önce diğer cihazların Firebase'e yüklediği medya veya kayıtları çekip birleştir ki hiçbir cihaz diğerinin verisini ezmesin!
+        if (fbBase && fbBase.startsWith('http')) {
+          try {
+            await pullAndMergeCloudMediaRegistry();
+            const existingRes = await fetchWithTimeout(`${fbBase}/${primaryTopic}.json`, {}, 3800);
+            if (existingRes.ok) {
+              const existingFbData = await existingRes.json();
+              if (existingFbData && existingFbData.ts) {
+                mergeIncomingCloudPayload(existingFbData, false);
+              }
+            }
+          } catch (e) {}
+        }
+
+        // 1. Atomik Bulut Medya Kayıt Defterini (ikv_media_registry_v1) ve Silinenleri PATCH ile güncelle
+        await pushAllLocalMediaItemsToCloudRegistry();
+        if (Array.isArray(cloudSyncConfig.deletedIds) && cloudSyncConfig.deletedIds.length > 0) {
+          syncDeletedIdsToCloud(cloudSyncConfig.deletedIds, []);
+        }
+
+        const payload = buildCompactSyncPayload(true);
+        const bodyStr = JSON.stringify(payload);
+
         try {
           localStorage.setItem('IKV_CloudMirror_' + primaryTopic, bodyStr);
         } catch (e) {}
 
-        // 1. Özel Firebase RTDB tanımlıysa oraya yaz
-        if (cloudSyncConfig.customFirebaseUrl && cloudSyncConfig.customFirebaseUrl.startsWith('http')) {
-          try {
-            const fbUrl = cloudSyncConfig.customFirebaseUrl.replace(/\/+$/, '') + '/' + primaryTopic + '.json';
-            const fbRes = await fetchWithTimeout(fbUrl, {
+        // 2. Firebase RTDB üzerine hem aktif oda koduna hem ortak şirket kanalına yaz
+        if (fbBase && fbBase.startsWith('http')) {
+          const fbWriteTopics = Array.from(new Set([primaryTopic, 'ikv_sync_v11_ik52']));
+          const fbResults = await Promise.allSettled(fbWriteTopics.map(tpc =>
+            fetchWithTimeout(`${fbBase}/${tpc}.json`, {
               method: 'PUT',
               body: bodyStr
-            }, 4500);
-            if (fbRes.ok) pushedOk = true;
-          } catch (e) {}
+            }, 6500)
+          ));
+          if (fbResults.some(r => r.status === 'fulfilled' && r.value && r.value.ok)) {
+            pushedOk = true;
+          }
         }
 
-        // 2. Paket boyutu > 3200 bayt ise ntfy 4KB attachment limitine takılmamak için önce bytebin veya parçalı metin kullan
-        let ntfyMessageStr = bodyStr;
-        if (bodyStr.length > 3200) {
+        // 3. Ntfy için hafifletilmiş sinyal paketi (thumbData hariç, < 3 KB, hız sınırına asla takılmaz)
+        const lightNtfyPayload = buildCompactSyncPayload(false);
+        const lightNtfyStr = JSON.stringify(lightNtfyPayload);
+        let ntfyMessageStr = lightNtfyStr;
+
+        if (lightNtfyStr.length > 3200) {
           try {
             const bbRes = await fetchWithTimeout('https://bytebin.lucko.me/post', {
               method: 'POST',
@@ -31369,37 +31736,23 @@ a { color: inherit; text-decoration: inherit; }
           } catch (e) {}
         }
 
-        if (ntfyMessageStr.length <= 3500) {
+        if (ntfyMessageStr.length <= 3800) {
           for (let i = 0; i < topics.length; i++) {
-            const ok = await postTextToAnyRelay(topics[i], ntfyMessageStr, 4800);
+            const ok = await postTextToAnyRelay(topics[i], ntfyMessageStr, 4500);
             if (ok) {
               pushedOk = true;
               break;
             }
           }
         } else {
-          // Çok büyük veri setlerinde (< 2600 bayt) parçalara bölerek gönder (ntfy attachment limitine asla takılmaz)
-          const chunkSize = 2500;
-          const totalChunks = Math.ceil(bodyStr.length / chunkSize);
-          const chunkId = 'chk_' + payload.ts + '_' + Math.random().toString(36).substring(2, 6);
-          let allChunksSent = true;
-          for (let c = 0; c < totalChunks; c++) {
-            const sliceStr = bodyStr.slice(c * chunkSize, (c + 1) * chunkSize);
-            const chunkMsg = JSON.stringify({
-              ts: payload.ts,
-              deviceId: payload.deviceId,
-              _chunkId: chunkId,
-              _idx: c,
-              _total: totalChunks,
-              _data: sliceStr
-            });
-            const ok = await postTextToAnyRelay(primaryTopic, chunkMsg, 4800);
-            if (!ok) {
-              allChunksSent = false;
-              break;
-            }
-          }
-          if (allChunksSent) pushedOk = true;
+          // Sadece kısa bildirim sinyali gönder (diğer cihazlar bu sinyali alınca Firebase'den tam paketi çeker)
+          const pingMsg = JSON.stringify({
+            ts: payload.ts,
+            deviceId: payload.deviceId,
+            roomCode: payload.roomCode,
+            _pullFirebase: true
+          });
+          await postTextToAnyRelay(primaryTopic, pingMsg, 4000);
         }
 
         cloudSyncConfig.lastSyncTimestamp = Date.now();
@@ -31407,7 +31760,7 @@ a { color: inherit; text-decoration: inherit; }
         updateCloudSyncUIStatus('Bağlı & Eşitlendi', false);
 
         if (manual) {
-          showToast('☁️ Tüm kayıtlar buluta başarıyla gönderildi ve eşitlendi!');
+          showToast('☁️ Tüm görseller, PDF şemalar ve kayıtlar bulutla eşitlendi!');
         }
         return pushedOk;
       } catch (err) {
@@ -31433,6 +31786,7 @@ a { color: inherit; text-decoration: inherit; }
       }
       const topics = getCandidateRoomTopics();
       const primaryTopic = topics[0];
+      const fbBase = getFirebaseBaseOrDefault();
 
       const btnPull = document.getElementById('btnPullCloudNow');
       const origPullHtml = btnPull ? btnPull.innerHTML : '';
@@ -31458,26 +31812,39 @@ a { color: inherit; text-decoration: inherit; }
           }
         } catch (e) {}
 
-        if (cloudSyncConfig.customFirebaseUrl && cloudSyncConfig.customFirebaseUrl.startsWith('http')) {
-          try {
-            const fbUrl = cloudSyncConfig.customFirebaseUrl.replace(/\/+$/, '') + '/' + primaryTopic + '.json';
-            const fbRes = await fetchWithTimeout(fbUrl, {}, 4000);
-            if (fbRes.ok) {
-              anyServerReached = true;
-              const fbData = await fbRes.json();
-              if (fbData && fbData.ts) {
-                payloads.push(fbData);
-              }
-            }
-          } catch (e) {}
-        }
-
         const fetchPromises = [];
-        for (const relay of CLOUD_NTFY_RELAYS) {
+
+        // 1. Atomik Bulut Medya Kayıt Defterini (ikv_media_registry_v1) çek ve modellere yerleştir
+        fetchPromises.push((async () => {
+          const medUpdated = await pullAndMergeCloudMediaRegistry();
+          if (medUpdated) anyUpdated = true;
+        })());
+
+        // 2. Firebase üzerindeki tüm aday oda kanallarından (ikv_sync_v11_ik52 dahil) ana paketleri çek
+        if (fbBase && fbBase.startsWith('http')) {
           for (const tpc of topics) {
             fetchPromises.push((async () => {
               try {
-                const res = await fetchWithTimeout(relay + '/' + tpc + '/json?poll=1&since=all', {}, 4500);
+                const fbUrl = fbBase + '/' + tpc + '.json';
+                const fbRes = await fetchWithTimeout(fbUrl, {}, 5000);
+                if (fbRes.ok) {
+                  anyServerReached = true;
+                  const fbData = await fbRes.json();
+                  if (fbData && fbData.ts) {
+                    payloads.push(fbData);
+                  }
+                }
+              } catch (e) {}
+            })());
+          }
+        }
+
+        // 3. Ntfy kanallarını kontrol et
+        for (const relay of CLOUD_NTFY_RELAYS) {
+          for (const tpc of topics.slice(0, 2)) {
+            fetchPromises.push((async () => {
+              try {
+                const res = await fetchWithTimeout(relay + '/' + tpc + '/json?poll=1&since=all', {}, 4200);
                 if (res.ok) {
                   anyServerReached = true;
                   const text = await res.text();
@@ -31486,7 +31853,7 @@ a { color: inherit; text-decoration: inherit; }
                     try {
                       const msg = JSON.parse(line);
                       const extracted = await extractPayloadFromNtfyMessage(msg);
-                      if (extracted && extracted.ts) {
+                      if (extracted && extracted.ts && !extracted._pullFirebase) {
                         payloads.push(extracted);
                       }
                     } catch (e) {}
@@ -31500,7 +31867,6 @@ a { color: inherit; text-decoration: inherit; }
         await Promise.allSettled(fetchPromises);
 
         if (payloads.length > 0) {
-          // Önce tüm paketlerdeki silinen ID listesini (deletedIds) birleştir ki eski ntfy mesajları silinen modelleri geri getirmesin!
           const allDeletedUnion = new Set(cloudSyncConfig.deletedIds || []);
           for (const p of payloads) {
             if (p && Array.isArray(p.deletedIds)) {
@@ -31526,17 +31892,32 @@ a { color: inherit; text-decoration: inherit; }
           }
         }
 
+        // Tekrar medya defterini kontrol et ki gelen yeni modellerin içine medya öğeleri eksiksiz yerleşsin
+        if (await pullAndMergeCloudMediaRegistry()) {
+          anyUpdated = true;
+        }
+
+        // Bu cihazda olup henüz bulut medya defterine yazılmamış görsel/PDF varsa arka planda gönder
+        pushAllLocalMediaItemsToCloudRegistry().catch(() => {});
+        autoPrefetchRemoteMediaBlobs();
+
         cloudSyncConfig.lastSyncTimestamp = Date.now();
         saveCloudSyncConfig();
         updateCloudSyncUIStatus('Bağlı & Eşitlendi', false);
 
+        renderBrands(document.getElementById('inputBrandSearch')?.value || '');
+        if (!document.getElementById('viewModelList').classList.contains('hidden')) renderModels();
+        if (!document.getElementById('viewModelDetail').classList.contains('hidden')) renderModelDetail();
+        if (!document.getElementById('viewServiceForms').classList.contains('hidden')) renderServiceForms();
+        if (!document.getElementById('viewFleet').classList.contains('hidden')) renderFleetView();
+
         if (anyUpdated && manual) {
-          showToast('☁️ Buluttaki yeni servis fişleri, şemalar ve makineler eşitlendi!');
+          showToast('☁️ Buluttaki yeni görseller, PDF şemalar ve kayıtlar eşitlendi!');
           return true;
         }
 
         if (manual) {
-          showToast('✓ Bulut senkronizasyonu tamamlandı: Tüm kayıtlarınız güncel!');
+          showToast('✓ Bulut senkronizasyonu tamamlandı: Tüm görsel ve kayıtlarınız güncel!');
         }
         return true;
       } catch (err) {
@@ -31557,6 +31938,19 @@ a { color: inherit; text-decoration: inherit; }
           updateCloudSyncUIStatus('Bağlı & Eşitlendi', false);
         }
       }
+    }
+
+    async function syncCloudBothWays(manual = false) {
+      if (manual) syncRoomCodeInputToConfig();
+      await pullStoreFromCloud(false);
+      await pushAllLocalMediaBlobsToCloud(false, false);
+      await pushAllLocalMediaItemsToCloudRegistry();
+      await pushStoreToCloud(manual);
+      renderBrands(document.getElementById('inputBrandSearch')?.value || '');
+      if (!document.getElementById('viewModelList').classList.contains('hidden')) renderModels();
+      if (!document.getElementById('viewModelDetail').classList.contains('hidden')) renderModelDetail();
+      if (!document.getElementById('viewServiceForms').classList.contains('hidden')) renderServiceForms();
+      if (!document.getElementById('viewFleet').classList.contains('hidden')) renderFleetView();
     }
 
     function startLiveCloudSubscription() {
@@ -31602,12 +31996,17 @@ a { color: inherit; text-decoration: inherit; }
             }
             const payload = await extractPayloadFromNtfyMessage(data);
             if (payload && payload.deviceId !== cloudSyncConfig.deviceId) {
+              if (payload._pullFirebase) {
+                pullStoreFromCloud(false);
+                return;
+              }
               const pTs = Number(payload.ts || 0);
               if (pTs > Number(cloudSyncConfig.lastProcessedPayloadTs || 0)) {
                 cloudSyncConfig.lastProcessedPayloadTs = pTs;
                 saveCloudSyncConfig();
               }
               mergeIncomingCloudPayload(payload, false);
+              pullAndMergeCloudMediaRegistry();
             }
           } catch (e) {}
         };
@@ -31983,7 +32382,11 @@ let toastHideTimer = null;
         } else {
           previewHtml = `
             <div class="h-28 bg-slate-800 overflow-hidden relative cursor-pointer flex items-center justify-center">
-              ${imgPreviewSrc ? `<img src="${imgPreviewSrc}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform">` : `<span class="text-2xl">🖼️</span>`}
+              <img data-card-img-id="${item.id}" src="${imgPreviewSrc || ''}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform ${imgPreviewSrc ? '' : 'hidden'}">
+              <span data-card-placeholder-id="${item.id}" class="text-xs text-slate-400 font-bold flex flex-col items-center gap-1 ${imgPreviewSrc ? 'hidden' : ''}">
+                <span class="text-2xl animate-pulse">🖼️</span>
+                <span class="text-[9px] text-amber-400">Buluttan Yükleniyor...</span>
+              </span>
               <span class="absolute top-1.5 left-1.5 text-[9px] font-black bg-black/70 text-amber-400 px-1.5 py-0.5 rounded">
                 ${item.category === 'balance' ? '⚖️ DENGE' : '⚡ ŞEMA'}
               </span>
@@ -32031,6 +32434,27 @@ let toastHideTimer = null;
         });
 
         grid.appendChild(card);
+
+        if (item.type !== 'pdf' && !imgPreviewSrc) {
+          resolveMediaBlob(item).then(async (blob) => {
+            if (!blob) return;
+            const dUrl = await blobToDataUrl(blob);
+            if (!dUrl) return;
+            const thumb = await generateCompactThumbFromDataUrl(dUrl, 750, 0.74);
+            item.thumbData = thumb || dUrl;
+            if (!item.data || item.data.startsWith('idb://')) {
+              item.data = item.thumbData;
+            }
+            const imgEl = card.querySelector(`[data-card-img-id="${item.id}"]`);
+            const phEl = card.querySelector(`[data-card-placeholder-id="${item.id}"]`);
+            if (imgEl) {
+              imgEl.src = item.thumbData;
+              imgEl.classList.remove('hidden');
+            }
+            if (phEl) phEl.classList.add('hidden');
+            saveStore(false);
+          }).catch(() => {});
+        }
       });
 
       renderModelCodesList(model.codes || []);
@@ -33189,12 +33613,14 @@ let toastHideTimer = null;
       if (!Array.isArray(cloudSyncConfig.deletedIds)) cloudSyncConfig.deletedIds = [];
       if (!cloudSyncConfig.deletedIds.includes(mediaId)) cloudSyncConfig.deletedIds.push(mediaId);
       saveCloudSyncConfig();
+      syncDeletedIdsToCloud([mediaId], [mediaId]);
 
       model.media = model.media.filter(m => m.id !== mediaId);
       deleteMediaBlobFromIDB(mediaId);
-      saveStore();
+      saveStore(false);
+      pushStoreToCloud(false);
       renderModelDetail();
-      showToast('Belge başarıyla silindi');
+      showToast('Belge tüm cihazlardan silindi');
     }
 
     // ============================================================================
@@ -33782,6 +34208,7 @@ let toastHideTimer = null;
       if (newTitle) mediaItem.title = newTitle;
       mediaItem.notes = newNote || 'Not girilmemiş';
 
+      pushSingleMediaItemToCloudRegistry(mediaItem, brand, model);
       saveStore();
       renderModelDetail();
 
@@ -33837,11 +34264,13 @@ let toastHideTimer = null;
           };
           model.media.unshift(newPdfItem);
           renderModelDetail();
+          await pushSingleMediaItemToCloudRegistry(newPdfItem, brand, model);
           showCloudUploadBanner(`☁️ "${finalTitle}" Buluta Yükleniyor...`, 5, 'Sunucu bağlantısı kuruldu...', true);
           const upOk = await pushMediaBlobToCloud(mediaId, blobCopy, newPdfItem, (pct, msg) => {
             showCloudUploadBanner(`☁️ "${finalTitle}" Buluta Yükleniyor...`, pct, msg);
           });
           hideCloudUploadBanner();
+          await pushSingleMediaItemToCloudRegistry(newPdfItem, brand, model);
           saveStore(false);
           await pushStoreToCloud(false);
           if (upOk) {
@@ -33851,46 +34280,68 @@ let toastHideTimer = null;
           }
           loadedCount++;
         } else {
-          // Görseller için hem ikili IDB'ye kaydet hem de diğer cihazlarda anında net görünmesi için optimize JPEG ve cloudBlobUrl üret
+          // Görseller için hem anında bulut önizlemesi (thumbData ~40KB) hem de yüksek çözünürlüklü tam ekran JPEG (1800px) üret
           const dataUrl = await new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = (e) => resolve(e.target.result);
             reader.onerror = () => resolve('');
             reader.readAsDataURL(file);
           });
-          const thumbDataUrl = await new Promise((resolve) => {
+          const { thumbDataUrl, fullJpegDataUrl } = await new Promise((resolve) => {
             const tempImg = new Image();
             tempImg.onload = () => {
-              const maxW = 1100;
-              const scale = Math.min(1, maxW / (tempImg.naturalWidth || 1100));
-              const c = document.createElement('canvas');
-              c.width = Math.max(1, Math.floor((tempImg.naturalWidth || 1100) * scale));
-              c.height = Math.max(1, Math.floor((tempImg.naturalHeight || 800) * scale));
-              const ctx = c.getContext('2d');
-              ctx.drawImage(tempImg, 0, 0, c.width, c.height);
-              resolve(c.toDataURL('image/jpeg', 0.75));
+              try {
+                const nw = tempImg.naturalWidth || 1200;
+                const nh = tempImg.naturalHeight || 900;
+                // 1. Hızlı Bulut Senkronizasyon Önizlemesi (750px, ~35-50 KB - tüm cihazlarda 0.2 saniyede açılır!)
+                const scaleThumb = Math.min(1, 750 / nw);
+                const cThumb = document.createElement('canvas');
+                cThumb.width = Math.max(1, Math.floor(nw * scaleThumb));
+                cThumb.height = Math.max(1, Math.floor(nh * scaleThumb));
+                cThumb.getContext('2d').drawImage(tempImg, 0, 0, cThumb.width, cThumb.height);
+                const tUrl = cThumb.toDataURL('image/jpeg', 0.74);
+
+                // 2. Tam Ekran Yakınlaştırma İçin Yüksek Çözünürlüklü Kopya (1800px, ~200-350 KB)
+                const scaleFull = Math.min(1, 1800 / nw);
+                const cFull = document.createElement('canvas');
+                cFull.width = Math.max(1, Math.floor(nw * scaleFull));
+                cFull.height = Math.max(1, Math.floor(nh * scaleFull));
+                cFull.getContext('2d').drawImage(tempImg, 0, 0, cFull.width, cFull.height);
+                const fUrl = cFull.toDataURL('image/jpeg', 0.86);
+
+                resolve({ thumbDataUrl: tUrl, fullJpegDataUrl: fUrl });
+              } catch (err) {
+                resolve({ thumbDataUrl: '', fullJpegDataUrl: dataUrl });
+              }
             };
-            tempImg.onerror = () => resolve('');
+            tempImg.onerror = () => resolve({ thumbDataUrl: '', fullJpegDataUrl: dataUrl });
             tempImg.src = dataUrl;
           });
-          await saveMediaBlobToIDB(mediaId, file);
+
+          const fullImgBlob = dataUrlToBlobDirect(fullJpegDataUrl || dataUrl, 'image/jpeg') || file;
+          await saveMediaBlobToIDB(mediaId, fullImgBlob);
+
           const newImgItem = {
             id: mediaId,
             title: finalTitle,
             category: category,
             type: type,
-            data: dataUrl,
-            thumbData: thumbDataUrl,
+            data: fullJpegDataUrl || dataUrl,
+            thumbData: thumbDataUrl || fullJpegDataUrl || dataUrl,
             date: new Date().toLocaleDateString('tr-TR'),
             notes: finalNote
           };
           model.media.unshift(newImgItem);
           saveStore(false);
           renderModelDetail();
-          if (cloudSyncConfig.autoSync) {
-            await pushMediaBlobToCloud(mediaId, file, newImgItem);
-            saveStore(false);
-          }
+
+          // 1. Önce görselin önizlemesini ve kimliğini Atomik Bulut Medya Defterine anında yaz (diğer cihazda 0.3 saniyede görünür!)
+          await pushSingleMediaItemToCloudRegistry(newImgItem, brand, model);
+          // 2. Tam çözünürlüklü görsel paketini buluta yükle ve tüm cihazlarla eşitle
+          await pushMediaBlobToCloud(mediaId, fullImgBlob, newImgItem);
+          await pushSingleMediaItemToCloudRegistry(newImgItem, brand, model);
+          saveStore(false);
+          await pushStoreToCloud(false);
           loadedCount++;
         }
       }
@@ -35679,7 +36130,10 @@ let toastHideTimer = null;
         }
         await pullStoreFromCloud(false);
         setTimeout(() => startLiveCloudSubscription(), 800);
-        setTimeout(() => pushAllLocalMediaBlobsToCloud(true), 1500);
+        setTimeout(async () => {
+          await pushAllLocalMediaItemsToCloudRegistry();
+          await pushAllLocalMediaBlobsToCloud(true);
+        }, 1200);
         setTimeout(() => autoPrefetchRemoteMediaBlobs(), 2600);
       }, 250);
 
@@ -36580,9 +37034,11 @@ let toastHideTimer = null;
         document.getElementById('inputCloudRoomCode').value = cloudSyncConfig.roomCode || 'İK52';
         document.getElementById('chkAutoCloudSync').checked = !!cloudSyncConfig.autoSync;
         document.getElementById('inputCustomFirebaseUrl').value = cloudSyncConfig.customFirebaseUrl || DEFAULT_FIREBASE_URL;
-        updateCloudSyncUIStatus('Aktif');
+        updateCloudSyncUIStatus('Eşitleniyor...');
         updateFirebaseStatusBadge();
         modalCloudSync.classList.remove('hidden');
+        // Kullanıcı üstteki "Bulut Eşitle" butonuna bastığı anda otomatik çift yönlü eşitlemeyi başlat!
+        syncCloudBothWays(true);
       }
 
       document.getElementById('btnHeaderCloudSync')?.addEventListener('click', openCloudSyncModal);
@@ -36667,10 +37123,27 @@ let toastHideTimer = null;
         }
       });
 
-      document.getElementById('btnPullCloudNow')?.addEventListener('click', () => pullStoreFromCloud(true));
+      document.getElementById('btnFullTwoWaySyncNow')?.addEventListener('click', async () => {
+        const btn = document.getElementById('btnFullTwoWaySyncNow');
+        const orig = btn ? btn.innerHTML : '';
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<span>⏳</span><span>Tüm Görseller ve Kayıtlar Eşitleniyor...</span>';
+        }
+        try {
+          await syncCloudBothWays(true);
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = orig;
+          }
+        }
+      });
+      document.getElementById('btnPullCloudNow')?.addEventListener('click', async () => {
+        await pullStoreFromCloud(true);
+      });
       document.getElementById('btnPushCloudNow')?.addEventListener('click', async () => {
-        await pushAllLocalMediaBlobsToCloud(true);
-        await pushStoreToCloud(true);
+        await syncCloudBothWays(true);
       });
 
       document.getElementById('btnShareDatabaseFile')?.addEventListener('click', async () => {
