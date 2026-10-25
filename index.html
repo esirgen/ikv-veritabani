@@ -30362,6 +30362,180 @@ a { color: inherit; text-decoration: inherit; }
       showToast('"' + brand.name + '" markası tüm cihazlardan silindi');
     }
 
+    
+    const USER_MEDIA_REGISTRY_KEY = 'InanirKuleVinc_UserMediaRegistry_v1';
+
+    function normalizeBrandModelMatchKey(str) {
+      const trMap = { 'İ': 'i', 'I': 'i', 'ı': 'i', 'i': 'i', 'Ş': 's', 'ş': 's', 'Ğ': 'g', 'ğ': 'g', 'Ü': 'u', 'ü': 'u', 'Ö': 'o', 'ö': 'o', 'Ç': 'c', 'ç': 'c' };
+      return String(str || '').replace(/[İIıiŞşĞğÜüÖöÇç]/g, ch => trMap[ch] || ch).toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+
+    function saveUserMediaRegistryToLocal() {
+      try {
+        const deletedSet = new Set(cloudSyncConfig.deletedIds || []);
+        let existingReg = {};
+        try {
+          const raw = localStorage.getItem(USER_MEDIA_REGISTRY_KEY);
+          if (raw) existingReg = JSON.parse(raw) || {};
+        } catch (e) {}
+
+        // Clean deleted items from existing registry
+        Object.keys(existingReg).forEach(k => {
+          if (Array.isArray(existingReg[k])) {
+            existingReg[k] = existingReg[k].filter(med => med && med.id && !deletedSet.has(med.id));
+            if (existingReg[k].length === 0) delete existingReg[k];
+          }
+        });
+
+        // Merge current store media into registry
+        (store.brands || []).forEach(b => {
+          (b.models || []).forEach(m => {
+            const customItems = (m.media || []).filter(med => med && med.id && med.id !== 'med-p1' && !deletedSet.has(med.id));
+            if (customItems.length > 0) {
+              const lightItems = customItems.map(med => ({
+                id: med.id,
+                title: med.title || 'Belge',
+                category: med.category || 'electronic',
+                type: med.type || 'pdf',
+                data: (med.data && med.data.length > 90000) ? ('idb://' + med.id) : (med.data || ('idb://' + med.id)),
+                thumbData: (med.thumbData && med.thumbData.length < 90000) ? med.thumbData : '',
+                date: med.date || '',
+                notes: med.notes || '',
+                externalUrl: med.externalUrl || '',
+                cloudBlobUrl: med.cloudBlobUrl || '',
+                brandId: b.id,
+                brandName: b.name,
+                modelId: m.id,
+                modelName: m.name
+              }));
+              const keys = [m.id, 'bm_' + normalizeBrandModelMatchKey(b.name) + '_' + normalizeBrandModelMatchKey(m.name)];
+              keys.forEach(k => {
+                const prevList = Array.isArray(existingReg[k]) ? existingReg[k] : [];
+                const byId = new Map();
+                prevList.forEach(item => { if (item && item.id && !deletedSet.has(item.id)) byId.set(item.id, item); });
+                lightItems.forEach(item => {
+                  if (byId.has(item.id)) {
+                    const old = byId.get(item.id);
+                    byId.set(item.id, Object.assign({}, old, item, {
+                      cloudBlobUrl: item.cloudBlobUrl || old.cloudBlobUrl || '',
+                      thumbData: item.thumbData || old.thumbData || '',
+                      data: (item.data && !item.data.startsWith('idb://')) ? item.data : (old.data || item.data)
+                    }));
+                  } else {
+                    byId.set(item.id, item);
+                  }
+                });
+                existingReg[k] = Array.from(byId.values());
+              });
+            }
+          });
+        });
+
+        localStorage.setItem(USER_MEDIA_REGISTRY_KEY, JSON.stringify(existingReg));
+      } catch (e) {}
+    }
+
+    function restoreUserMediaFromLocalRegistry() {
+      try {
+        const raw = localStorage.getItem(USER_MEDIA_REGISTRY_KEY);
+        if (!raw) return false;
+        const reg = JSON.parse(raw);
+        if (!reg || typeof reg !== 'object') return false;
+        const deletedSet = new Set(cloudSyncConfig.deletedIds || []);
+        let restoredAny = false;
+
+        (store.brands || []).forEach(b => {
+          (b.models || []).forEach(m => {
+            if (!Array.isArray(m.media)) m.media = [];
+            const compositeKey = 'bm_' + normalizeBrandModelMatchKey(b.name) + '_' + normalizeBrandModelMatchKey(m.name);
+            const candidates = [
+              ...(Array.isArray(reg[m.id]) ? reg[m.id] : []),
+              ...(Array.isArray(reg[compositeKey]) ? reg[compositeKey] : [])
+            ];
+            candidates.forEach(cMed => {
+              if (!cMed || !cMed.id || deletedSet.has(cMed.id)) return;
+              const existing = m.media.find(x => x.id === cMed.id);
+              if (!existing) {
+                m.media.unshift(Object.assign({}, cMed));
+                restoredAny = true;
+              } else {
+                if (cMed.cloudBlobUrl && !existing.cloudBlobUrl) { existing.cloudBlobUrl = cMed.cloudBlobUrl; restoredAny = true; }
+                if (cMed.thumbData && !existing.thumbData) { existing.thumbData = cMed.thumbData; restoredAny = true; }
+                if (cMed.notes && existing.notes !== cMed.notes) { existing.notes = cMed.notes; restoredAny = true; }
+                if (cMed.title && existing.title !== cMed.title) { existing.title = cMed.title; restoredAny = true; }
+              }
+            });
+          });
+        });
+        return restoredAny;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function mergeBrandsAndMediaFromIDB(idbBrands) {
+      if (!Array.isArray(idbBrands)) return false;
+      const deletedSet = new Set(cloudSyncConfig.deletedIds || []);
+      let anyMerged = false;
+
+      idbBrands.forEach(idbBrand => {
+        if (!idbBrand || deletedSet.has(idbBrand.id) || deletedSet.has(getDeletedBrandKey(idbBrand.name))) return;
+        let targetBrand = (store.brands || []).find(b => b.id === idbBrand.id || normalizeBrandModelMatchKey(b.name) === normalizeBrandModelMatchKey(idbBrand.name));
+        if (!targetBrand) {
+          const bCopy = JSON.parse(JSON.stringify(idbBrand));
+          bCopy.models = (bCopy.models || []).filter(m => m && !deletedSet.has(m.id) && !deletedSet.has(getDeletedModelKey(bCopy.id, m.name)));
+          store.brands.push(bCopy);
+          anyMerged = true;
+          return;
+        }
+        if (!Array.isArray(targetBrand.models)) targetBrand.models = [];
+        (idbBrand.models || []).forEach(idbModel => {
+          if (!idbModel || deletedSet.has(idbModel.id) || deletedSet.has(getDeletedModelKey(targetBrand.id, idbModel.name)) || deletedSet.has(getDeletedModelKey(idbBrand.id, idbModel.name))) return;
+          let targetModel = targetBrand.models.find(m => m.id === idbModel.id || normalizeBrandModelMatchKey(m.name) === normalizeBrandModelMatchKey(idbModel.name));
+          if (!targetModel) {
+            targetBrand.models.push(JSON.parse(JSON.stringify(idbModel)));
+            anyMerged = true;
+            return;
+          }
+          if (!Array.isArray(targetModel.media)) targetModel.media = [];
+          (idbModel.media || []).forEach(idbMed => {
+            if (!idbMed || !idbMed.id || deletedSet.has(idbMed.id)) return;
+            const existingMed = targetModel.media.find(x => x.id === idbMed.id);
+            if (!existingMed) {
+              targetModel.media.unshift(idbMed);
+              anyMerged = true;
+            } else {
+              if (idbMed.data && !idbMed.data.startsWith('idb://') && (!existingMed.data || existingMed.data.startsWith('idb://'))) {
+                existingMed.data = idbMed.data;
+                anyMerged = true;
+              }
+              if (idbMed.cloudBlobUrl && !existingMed.cloudBlobUrl) {
+                existingMed.cloudBlobUrl = idbMed.cloudBlobUrl;
+                anyMerged = true;
+              }
+              if (idbMed.thumbData && !existingMed.thumbData) {
+                existingMed.thumbData = idbMed.thumbData;
+                anyMerged = true;
+              }
+              if (idbMed.notes && existingMed.notes !== idbMed.notes) {
+                existingMed.notes = idbMed.notes;
+                anyMerged = true;
+              }
+            }
+          });
+          if (!Array.isArray(targetModel.codes)) targetModel.codes = [];
+          (idbModel.codes || []).forEach(idbCode => {
+            if (!idbCode || !idbCode.id || deletedSet.has(idbCode.id)) return;
+            if (!targetModel.codes.some(c => c.id === idbCode.id || c.code === idbCode.code)) {
+              targetModel.codes.unshift(idbCode);
+              anyMerged = true;
+            }
+          });
+        });
+      });
+      return anyMerged;
+    }
+
     function mergeWithDefaultLibraries() {
       const deletedSet = new Set(cloudSyncConfig.deletedIds || []);
 
@@ -30450,6 +30624,7 @@ a { color: inherit; text-decoration: inherit; }
           }
         });
       });
+      restoreUserMediaFromLocalRegistry();
     }
 
     function loadStore() {
@@ -30460,9 +30635,9 @@ a { color: inherit; text-decoration: inherit; }
         const saved = localStorage.getItem('InanirKuleVinc_Store_v11') || localStorage.getItem('InanirKuleVinc_Store_v10') || localStorage.getItem('InanirKuleVinc_Store_v9');
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (parsed.brands && parsed.drives) {
+          if (parsed && Array.isArray(parsed.brands) && parsed.brands.length > 0) {
             store.brands = parsed.brands;
-            store.drives = parsed.drives;
+            store.drives = (Array.isArray(parsed.drives) && parsed.drives.length > 0) ? parsed.drives : JSON.parse(JSON.stringify(DRIVE_LIBRARY));
             store.serviceForms = (parsed.serviceForms && parsed.serviceForms.length > 0) ? parsed.serviceForms : SAMPLE_SERVICE_FORMS;
             store.companyInfo = parsed.companyInfo || DEFAULT_COMPANY_INFO;
             store.companyInfoUpdatedAt = parsed.companyInfoUpdatedAt || 0;
@@ -30493,8 +30668,7 @@ a { color: inherit; text-decoration: inherit; }
           }
         } catch (e) {}
         mergeWithDefaultLibraries();
-        try { localStorage.removeItem('InanirKuleVinc_Store_v9'); } catch(e) {}
-        saveStore(false);
+        try { localStorage.removeItem('InanirKuleVinc_Store_v9'); localStorage.removeItem('InanirKuleVinc_Store_v10'); } catch(e) {}
       } catch (e) {
         store = {
           brands: JSON.parse(JSON.stringify(CRANE_DATA)),
@@ -30733,6 +30907,11 @@ a { color: inherit; text-decoration: inherit; }
           (b.models || []).forEach(m => {
             if (!defModelIds.has(m.id)) {
               if (!customModelsByBrand[b.id]) customModelsByBrand[b.id] = [];
+              const serializedModMedia = (m.media || []).map(serializeSyncMediaItem).filter(Boolean);
+              if (serializedModMedia.length > 0) {
+                customMediaByModel[m.id] = serializedModMedia;
+                customMediaByModel['bm_' + normalizeBrandModelMatchKey(b.name) + '_' + normalizeBrandModelMatchKey(m.name)] = serializedModMedia;
+              }
               customModelsByBrand[b.id].push({
                 id: m.id,
                 name: m.name,
@@ -30741,7 +30920,7 @@ a { color: inherit; text-decoration: inherit; }
                 tipLoadTons: m.tipLoadTons,
                 description: m.description,
                 codes: m.codes || [],
-                media: (m.media || []).map(serializeSyncMediaItem).filter(Boolean)
+                media: serializedModMedia
               });
             } else {
               const defModel = (defBrand?.models || []).find(dm => dm.id === m.id);
@@ -30753,7 +30932,10 @@ a { color: inherit; text-decoration: inherit; }
               const defMediaIds = new Set((defModel?.media || []).map(dmed => dmed.id));
               const extraMedia = (m.media || []).filter(med => !defMediaIds.has(med.id) || med.notes !== (defModel?.media?.find(x => x.id === med.id)?.notes));
               if (extraMedia.length > 0) {
-                customMediaByModel[m.id] = extraMedia.map(serializeSyncMediaItem).filter(Boolean);
+                const serializedList = extraMedia.map(serializeSyncMediaItem).filter(Boolean);
+                customMediaByModel[m.id] = serializedList;
+                const compositeKey = 'bm_' + normalizeBrandModelMatchKey(b.name) + '_' + normalizeBrandModelMatchKey(m.name);
+                customMediaByModel[compositeKey] = serializedList;
               }
             }
           });
@@ -31029,7 +31211,8 @@ a { color: inherit; text-decoration: inherit; }
       if (payload.customMediaByModel && typeof payload.customMediaByModel === 'object') {
         store.brands.forEach(brand => {
           (brand.models || []).forEach(model => {
-            const extraMedia = payload.customMediaByModel[model.id];
+            const compositeKey = 'bm_' + normalizeBrandModelMatchKey(brand.name) + '_' + normalizeBrandModelMatchKey(model.name);
+            const extraMedia = payload.customMediaByModel[model.id] || payload.customMediaByModel[compositeKey];
             if (Array.isArray(extraMedia)) {
               if (mergeModelMediaList(model, extraMedia)) changed = true;
             }
@@ -31039,10 +31222,7 @@ a { color: inherit; text-decoration: inherit; }
 
       if (changed) {
         isSyncingFromCloud = true;
-        try {
-          localStorage.setItem('InanirKuleVinc_Store_v11', JSON.stringify(store));
-        } catch (e) {}
-        saveStoreToIDB(store);
+        saveStore(false);
         isSyncingFromCloud = false;
 
         renderBrands(document.getElementById('inputBrandSearch')?.value || '');
@@ -31269,10 +31449,12 @@ a { color: inherit; text-decoration: inherit; }
         updateCloudSyncUIStatus('Kontrol ediliyor...');
 
         try {
-          const localMirror = localStorage.getItem('IKV_CloudMirror_' + primaryTopic);
-          if (localMirror) {
-            const parsedMirror = JSON.parse(localMirror);
-            if (parsedMirror && parsedMirror.ts) payloads.push(parsedMirror);
+          for (const tpc of topics) {
+            const localMirror = localStorage.getItem('IKV_CloudMirror_' + tpc);
+            if (localMirror) {
+              const parsedMirror = JSON.parse(localMirror);
+              if (parsedMirror && parsedMirror.ts) payloads.push(parsedMirror);
+            }
           }
         } catch (e) {}
 
@@ -31334,9 +31516,6 @@ a { color: inherit; text-decoration: inherit; }
           let maxSeenTs = lastProcessedTs;
           for (const p of payloads) {
             const pTs = Number(p.ts || 0);
-            if (!manual && lastProcessedTs > 0 && pTs <= lastProcessedTs) {
-              continue;
-            }
             if (pTs > maxSeenTs) maxSeenTs = pTs;
             if (mergeIncomingCloudPayload(p, false)) {
               anyUpdated = true;
@@ -31487,8 +31666,9 @@ a { color: inherit; text-decoration: inherit; }
     }
 
     function saveStore(triggerCloudPush = true) {
+      saveUserMediaRegistryToLocal();
       try {
-        // Büyük base64 verilerini localStorage'a yazarken RAM patlamasını önlemek için hafif kopya oluştur
+        // localStorage 5MB kotasını asla aşmamak için sabit DRIVE_LIBRARY dizisini localStorage'a kopyalama ve görsel/PDF verilerini hafif referans olarak sakla
         const lightStore = {
           brands: (store.brands || []).map(b => ({
             ...b,
@@ -31496,19 +31676,45 @@ a { color: inherit; text-decoration: inherit; }
               ...m,
               media: (m.media || []).map(med => ({
                 ...med,
-                data: (med.data && med.data.length > 120000) ? ('idb://' + med.id) : med.data
+                data: (med.data && med.data.length > 90000) ? ('idb://' + med.id) : med.data,
+                thumbData: (med.thumbData && med.thumbData.length > 90000) ? '' : (med.thumbData || '')
               }))
             }))
           })),
-          drives: store.drives,
-          serviceForms: store.serviceForms,
+          serviceForms: (store.serviceForms || []).map(s => {
+            const sc = Object.assign({}, s);
+            delete sc.photos;
+            return sc;
+          }),
           machines: store.machines,
           companyInfo: store.companyInfo,
           companyInfoUpdatedAt: store.companyInfoUpdatedAt || 0
         };
         localStorage.setItem('InanirKuleVinc_Store_v11', JSON.stringify(lightStore));
       } catch (e) {
-        console.warn('localStorage kotası doldu, IndexedDB üzerinden tam kayıt devam ediyor:', e);
+        try {
+          // Acil durum ultra-hafif kayıt (kota tamamen doluysa thumbData olmadan kaydet)
+          const ultraLightStore = {
+            brands: (store.brands || []).map(b => ({
+              ...b,
+              models: (b.models || []).map(m => ({
+                ...m,
+                media: (m.media || []).map(med => ({
+                  ...med,
+                  data: 'idb://' + med.id,
+                  thumbData: ''
+                }))
+              }))
+            })),
+            serviceForms: (store.serviceForms || []).map(s => { const sc = Object.assign({}, s); delete sc.photos; return sc; }),
+            machines: store.machines,
+            companyInfo: store.companyInfo,
+            companyInfoUpdatedAt: store.companyInfoUpdatedAt || 0
+          };
+          localStorage.setItem('InanirKuleVinc_Store_v11', JSON.stringify(ultraLightStore));
+        } catch (e2) {
+          console.warn('localStorage kotası doldu, IndexedDB üzerinden tam kayıt devam ediyor:', e2);
+        }
       }
       saveStoreToIDB(store);
       if (triggerCloudPush && !isSyncingFromCloud && cloudSyncConfig.autoSync) {
@@ -32466,7 +32672,7 @@ let toastHideTimer = null;
                     localStorage.setItem('ikv_fb_pushed_v2_' + mediaId, '1');
                   } catch (e) {}
                   const roomTopic = getSanitizedRoomTopic();
-                  fetch(`${fbBase}/${roomTopic}_req/${mediaId}.json`, { method: 'DELETE' }).catch(() => {});
+                  fetchWithTimeout(`${fbBase}/${roomTopic}_req/${mediaId}.json`, { method: 'DELETE' }, 4000).catch(() => {});
                   if (onProgress) onProgress(100, '✓ Bulutta Zaten Mevcut!');
                   return true;
                 }
@@ -32621,7 +32827,7 @@ let toastHideTimer = null;
               fetchWithTimeout(`${fbBase}/${mediaTopic}/meta.json`, { method: 'PUT', body: manifestStr }, 8000)
             ]);
             const roomTopic = getSanitizedRoomTopic();
-            fetch(`${fbBase}/${roomTopic}_req/${mediaId}.json`, { method: 'DELETE' }).catch(() => {});
+            fetchWithTimeout(`${fbBase}/${roomTopic}_req/${mediaId}.json`, { method: 'DELETE' }, 4000).catch(() => {});
           }
           postTextToAnyRelay(mediaTopic, manifestStr, 5000).catch(() => {});
           postTextToAnyRelay(globalTopic, manifestStr, 5000).catch(() => {});
@@ -32675,7 +32881,7 @@ let toastHideTimer = null;
           const reqObj = reqMap[mediaId];
           if (!reqObj || reqObj.deviceId === cloudSyncConfig.deviceId) continue;
           // İsteği hemen temizle ki her sayfa açılışında kısır döngüye girmesin
-          fetch(`${fbBase}/${roomTopic}_req/${mediaId}.json`, { method: 'DELETE' }).catch(() => {});
+          fetchWithTimeout(`${fbBase}/${roomTopic}_req/${mediaId}.json`, { method: 'DELETE' }, 4000).catch(() => {});
           const localBlob = await getMediaBlobFromIDB(mediaId);
           if (localBlob) {
             let foundItem = null;
@@ -33679,9 +33885,11 @@ let toastHideTimer = null;
             notes: finalNote
           };
           model.media.unshift(newImgItem);
+          saveStore(false);
           renderModelDetail();
           if (cloudSyncConfig.autoSync) {
             await pushMediaBlobToCloud(mediaId, file, newImgItem);
+            saveStore(false);
           }
           loadedCount++;
         }
@@ -35352,38 +35560,41 @@ let toastHideTimer = null;
       loadCloudSyncConfig();
       loadStore();
       renderBrands();
-      // Büyük PDF dosyaları localStorage 5MB sınırını aştığında IndexedDB'den geri yükle
-      loadStoreFromIDB().then(idbData => {
+      // Büyük PDF dosyaları ve görselleri IndexedDB + Yerel Medya Kayıt Defteri üzerinden eksiksiz birleştir
+      const idbReadyPromise = loadStoreFromIDB().then(idbData => {
         if (idbData && Array.isArray(idbData.brands)) {
-          const countMedia = (brandsList) => (brandsList || []).reduce((acc, b) => acc + (b.models || []).reduce((mAcc, m) => mAcc + ((m.media && m.media.length) || 0), 0), 0);
-          if (countMedia(idbData.brands) >= countMedia(store.brands)) {
-            store.brands = idbData.brands;
-            if (Array.isArray(idbData.drives)) store.drives = idbData.drives;
-            if (idbData.serviceForms && idbData.serviceForms.length >= (store.serviceForms || []).length) store.serviceForms = idbData.serviceForms;
-            if (idbData.machines && idbData.machines.length >= (store.machines || []).length) store.machines = idbData.machines;
-            if (idbData.companyInfo && (!store.companyInfoUpdatedAt || (idbData.companyInfoUpdatedAt || 0) > (store.companyInfoUpdatedAt || 0))) {
-              store.companyInfo = idbData.companyInfo;
-              store.companyInfoUpdatedAt = idbData.companyInfoUpdatedAt || store.companyInfoUpdatedAt || 0;
-            }
-            try {
-          const savedUserComp = localStorage.getItem('InanirKuleVinc_UserCompanyInfo_v1');
-          if (savedUserComp) {
-            const parsedUserComp = JSON.parse(savedUserComp);
-            if (parsedUserComp && parsedUserComp.data && parsedUserComp.data.name) {
-              if (!store.companyInfoUpdatedAt || (parsedUserComp.updatedAt || 0) >= (store.companyInfoUpdatedAt || 0)) {
-                store.companyInfo = parsedUserComp.data;
-                store.companyInfoUpdatedAt = parsedUserComp.updatedAt || Date.now();
+          mergeBrandsAndMediaFromIDB(idbData.brands);
+          if (Array.isArray(idbData.drives) && idbData.drives.length > 0) store.drives = idbData.drives;
+          if (idbData.serviceForms && idbData.serviceForms.length > (store.serviceForms || []).length) store.serviceForms = idbData.serviceForms;
+          if (idbData.machines && idbData.machines.length > (store.machines || []).length) store.machines = idbData.machines;
+          if (idbData.companyInfo && (!store.companyInfoUpdatedAt || (idbData.companyInfoUpdatedAt || 0) > (store.companyInfoUpdatedAt || 0))) {
+            store.companyInfo = idbData.companyInfo;
+            store.companyInfoUpdatedAt = idbData.companyInfoUpdatedAt || store.companyInfoUpdatedAt || 0;
+          }
+          try {
+            const savedUserComp = localStorage.getItem('InanirKuleVinc_UserCompanyInfo_v1');
+            if (savedUserComp) {
+              const parsedUserComp = JSON.parse(savedUserComp);
+              if (parsedUserComp && parsedUserComp.data && parsedUserComp.data.name) {
+                if (!store.companyInfoUpdatedAt || (parsedUserComp.updatedAt || 0) >= (store.companyInfoUpdatedAt || 0)) {
+                  store.companyInfo = parsedUserComp.data;
+                  store.companyInfoUpdatedAt = parsedUserComp.updatedAt || Date.now();
+                }
               }
             }
-          }
-        } catch (e) {}
-        mergeWithDefaultLibraries();
-            applyCompanyInfoToUI();
-            renderBrands(document.getElementById('inputBrandSearch')?.value || '');
-            if (!document.getElementById('viewModelList').classList.contains('hidden')) renderModels();
-            if (!document.getElementById('viewModelDetail').classList.contains('hidden')) renderModelDetail();
-          }
+          } catch (e) {}
+          mergeWithDefaultLibraries();
+          saveStore(false);
+          applyCompanyInfoToUI();
+          renderBrands(document.getElementById('inputBrandSearch')?.value || '');
+          if (!document.getElementById('viewModelList').classList.contains('hidden')) renderModels();
+          if (!document.getElementById('viewModelDetail').classList.contains('hidden')) renderModelDetail();
+        } else {
+          restoreUserMediaFromLocalRegistry();
+          saveStore(false);
         }
+      }).catch(() => {
+        restoreUserMediaFromLocalRegistry();
       });
 
       // ÇEVRİMDIŞI (OFFLINE) PWA SERVICE WORKER & ÖNBELLEK MOTORU
@@ -35393,7 +35604,7 @@ let toastHideTimer = null;
             navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
           }
           if ('caches' in window && (location.protocol === 'https:' || location.protocol === 'http:')) {
-            const cache = await caches.open('ikv-offline-v16');
+            const cache = await caches.open('ikv-offline-v17');
             const fullHtml = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
             const resp1 = new Response(fullHtml, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
             const resp2 = new Response(fullHtml, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
@@ -35461,15 +35672,16 @@ let toastHideTimer = null;
 
       // Açılışta ve uygulama/sekme görünür olduğunda (yalnızca internet varsa) buluttan otomatik çek
       setTimeout(async () => {
+        try { await idbReadyPromise; } catch (e) {}
         if (navigator.onLine === false) {
           updateCloudSyncUIStatus('📴 Çevrimdışı Mod (İnternetsiz Aktif)', false);
           return;
         }
         await pullStoreFromCloud(false);
         setTimeout(() => startLiveCloudSubscription(), 800);
-        setTimeout(() => pushAllLocalMediaBlobsToCloud(true), 2000);
-        setTimeout(() => autoPrefetchRemoteMediaBlobs(), 3200);
-      }, 300);
+        setTimeout(() => pushAllLocalMediaBlobsToCloud(true), 1500);
+        setTimeout(() => autoPrefetchRemoteMediaBlobs(), 2600);
+      }, 250);
 
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && cloudSyncConfig.autoSync && navigator.onLine !== false) {
