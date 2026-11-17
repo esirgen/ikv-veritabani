@@ -1426,35 +1426,43 @@ a { color: inherit; text-decoration: inherit; }
           </div>
         </div>
 
-        <!-- 3. Bölüm: Vinç Bilgileri -->
+        <!-- 3. Bölüm: Vinç Bilgileri (İsteğe Bağlı) -->
         <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2.5">
-          <h4 class="font-bold text-amber-400 text-xs flex items-center gap-1.5 border-b border-slate-800 pb-1.5">
-            <span>🏗️</span> Kule Vinç Bilgileri
-          </h4>
-          <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+            <h4 class="font-bold text-amber-400 text-xs flex items-center gap-1.5">
+              <span>🏗️</span> Kule Vinç Bilgileri
+            </h4>
+            <span class="text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">
+              İsteğe Bağlı (Gömme ayak vb. işlerde boş bırakılabilir)
+            </span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
-              <label class="block text-slate-400 mb-1 font-semibold">Marka (Seçin veya Elle Yazın) *</label>
-              <div class="space-y-1.5">
+              <label class="block text-slate-400 mb-1 font-semibold">Marka (Seçin veya Elle Yazın)</label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 <select id="selectServiceCraneBrand" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-amber-400 font-bold focus:outline-none focus:border-amber-500">
                   <!-- Markalar dinamik doldurulacak -->
                 </select>
-                <input type="text" id="inputServiceCraneBrandManual" placeholder="Markayı manuel yazın (örn: Potain,BKT,Arcon)..." class="w-full bg-slate-900 border border-amber-500/40 rounded-xl px-3 py-2 text-amber-400 font-bold placeholder-slate-500 focus:outline-none focus:border-amber-500">
+                <input type="text" id="inputServiceCraneBrandManual" placeholder="Manuel marka (örn: JASO-DAHAN)..." class="w-full bg-slate-900 border border-amber-500/40 rounded-xl px-3 py-2 text-amber-400 font-bold placeholder-slate-500 focus:outline-none focus:border-amber-500">
               </div>
             </div>
             <div>
-              <label class="block text-slate-400 mb-1 font-semibold">Model *</label>
-              <input type="text" id="inputServiceCraneModel" placeholder="Örn: MDT 178, 280 EC-H" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500">
+              <label class="block text-slate-400 mb-1 font-semibold">Model (İsteğe Bağlı)</label>
+              <input type="text" id="inputServiceCraneModel" placeholder="Örn: J210 - QTZ6515, MDT 178, 280 EC-H..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500">
             </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
             <div>
-              <label class="block text-slate-400 mb-1 font-semibold">Kule / Vinç No</label>
+              <label class="block text-slate-400 mb-1 font-semibold">Kule / Seri / Şese No</label>
               <input type="text" id="inputServiceCraneSerial" placeholder="Örn: Vinç 1 / K-03" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500">
             </div>
             <div>
-              <label class="block text-slate-400 mb-1 font-semibold">Bom / Yükseklik (m)</label>
-              <div class="flex items-center gap-1">
-                <input type="text" id="inputServiceCraneJib" placeholder="60m Bom" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-2 text-white text-center focus:outline-none focus:border-amber-500">
-                <input type="text" id="inputServiceCraneHeight" placeholder="48m Yük." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-2 py-2 text-white text-center focus:outline-none focus:border-amber-500">
-              </div>
+              <label class="block text-slate-400 mb-1 font-semibold">Bom Uzunluğu</label>
+              <input type="text" id="inputServiceCraneJib" placeholder="Örn: 60m Bom / Kurulu Değil" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500">
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1 font-semibold">Kule Yüksekliği</label>
+              <input type="text" id="inputServiceCraneHeight" placeholder="Örn: 48m Yükseklik / Temel Ayak" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500">
             </div>
           </div>
         </div>
@@ -1527,20 +1535,37 @@ a { color: inherit; text-decoration: inherit; }
           </div>
         </div>
 
-        <!-- 7. Bölüm: Teslim Durumu & İmzalar -->
-        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2.5">
+        <!-- 7. Bölüm: Teslim Durumu, Özel Durum Notu, Yazı Rengi & İmzalar -->
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-3">
           <h4 class="font-bold text-amber-400 text-xs flex items-center gap-1.5 border-b border-slate-800 pb-1.5">
-            <span>✍️</span> Teslim Durumu & Yetkililer
+            <span>✍️</span> Vinç Nihai Durumu, Özel Durum Notu &amp; Yetkililer
           </h4>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div>
-              <label class="block text-slate-400 mb-1 font-semibold">Vinç Çalışma Durumu *</label>
+              <label class="block text-slate-400 mb-1 font-semibold">Vinç Nihai Durumu (Hazır Liste)</label>
               <select id="selectServiceStatus" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500">
                 <option value="Faal">🟢 Çalışır / Faal Teslim Edildi</option>
+                <option value="KuruluDegil">🔵 Makine Kurulu Değil (Temel / Gömme Ayak / Ön Hazırlık)</option>
+                <option value="MontajAsamasinda">🟣 Montaj / Kurulum Aşamasında</option>
                 <option value="Sartli">🟡 Şartlı Çalışır (Parça Bekleniyor)</option>
+                <option value="DemontajEdildi">⚪ Demontaj Edildi / Söküldü</option>
                 <option value="Emniyetsiz">🔴 Emniyetsiz / Kilitlendi (Kullanım Dışı)</option>
+                <option value="Ozel">✏️ Kendi Özel Durum Notumu Yazacağım</option>
               </select>
             </div>
+            <div class="sm:col-span-2">
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-amber-300 font-bold text-[11px]">✏️ Vinç Nihai Durumuna Kendi Notunuzu / Özel Durumu Yazın:</label>
+                <select id="selectCustomStatusMode" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-0.5 text-[10px] text-amber-400 font-bold focus:outline-none">
+                  <option value="append">Seçili Durumun Yanına Ekle</option>
+                  <option value="replace">Sadece Kendi Yazdığımı Göster</option>
+                </select>
+              </div>
+              <input type="text" id="inputServiceCustomStatus" placeholder="Örn: STATİK AYAKLAR TERAZİYE ALINDI, BETON DÖKÜMÜNE HAZIR (Boş bırakılırsa sadece seçili durum yazar)..." class="w-full bg-slate-900 border border-amber-500/40 rounded-xl px-3 py-2 text-white font-bold placeholder-slate-500 focus:outline-none focus:border-amber-400">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
               <label class="block text-slate-400 mb-1 font-semibold">İnanır Vinç Teknisyeni *</label>
               <input type="text" id="inputServiceTechnician" placeholder="Örn: Servis Teknisyeni" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-semibold">
@@ -1550,9 +1575,67 @@ a { color: inherit; text-decoration: inherit; }
               <input type="text" id="inputServiceReceiver" placeholder="Örn: Ali Yılmaz (Şantiye Şefi)" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-semibold">
             </div>
           </div>
+
           <div>
-            <label class="block text-slate-400 mb-1 font-semibold">Özel Notlar & Operatöre Tavsiyeler</label>
+            <label class="block text-slate-400 mb-1 font-semibold">Özel Notlar &amp; Operatöre Tavsiyeler</label>
             <input type="text" id="inputServiceNotes" placeholder="Örn: Aşırı rüzgarda fırdöndüye bırakılmalı, 10 gün sonra fren sentili tekrar kontrol edilmeli..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500">
+          </div>
+
+          <!-- 8. Bölüm: Servis Fişi Yazı Rengi Özelleştirme -->
+          <div class="pt-2 border-t border-slate-800/90 space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <label class="font-bold text-amber-400 text-xs flex items-center gap-1.5">
+                <span>🎨</span> Servis Fişinde Yazdığınız Yazıların Rengi:
+              </label>
+              <div class="flex items-center flex-wrap gap-1.5">
+                <button type="button" data-color="#0f172a" class="service-color-preset-btn px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-[10px] font-bold text-white flex items-center gap-1 hover:border-amber-400 transition">
+                  <span class="w-3 h-3 rounded-full bg-slate-950 border border-white/40 inline-block"></span> Siyah
+                </button>
+                <button type="button" data-color="#1d4ed8" class="service-color-preset-btn px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-[10px] font-bold text-blue-400 flex items-center gap-1 hover:border-amber-400 transition">
+                  <span class="w-3 h-3 rounded-full bg-blue-700 inline-block"></span> Kalem Mavisi
+                </button>
+                <button type="button" data-color="#dc2626" class="service-color-preset-btn px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-[10px] font-bold text-red-400 flex items-center gap-1 hover:border-amber-400 transition">
+                  <span class="w-3 h-3 rounded-full bg-red-600 inline-block"></span> Kırmızı
+                </button>
+                <button type="button" data-color="#047857" class="service-color-preset-btn px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-[10px] font-bold text-emerald-400 flex items-center gap-1 hover:border-amber-400 transition">
+                  <span class="w-3 h-3 rounded-full bg-emerald-700 inline-block"></span> Yeşil
+                </button>
+                <button type="button" data-color="#b45309" class="service-color-preset-btn px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-[10px] font-bold text-amber-400 flex items-center gap-1 hover:border-amber-400 transition">
+                  <span class="w-3 h-3 rounded-full bg-amber-700 inline-block"></span> Turuncu
+                </button>
+                <button type="button" data-color="#6d28d9" class="service-color-preset-btn px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-[10px] font-bold text-purple-400 flex items-center gap-1 hover:border-amber-400 transition">
+                  <span class="w-3 h-3 rounded-full bg-purple-700 inline-block"></span> Mor
+                </button>
+                <label class="cursor-pointer px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-[10px] font-bold text-slate-200 flex items-center gap-1 hover:border-amber-400 transition" title="Özel Renk Seç">
+                  <input type="color" id="inputServiceGlobalTextColor" value="#0f172a" class="w-4 h-4 rounded cursor-pointer border-0 bg-transparent p-0">
+                  <span>Özel</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Bölüm Bazlı Ayrı Renk Seçimi -->
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-[10px]">
+              <label class="flex items-center justify-between gap-1 bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-800 cursor-pointer">
+                <span class="text-slate-300 font-semibold truncate">Şantiye/Künye:</span>
+                <input type="color" id="inputColorInfo" value="#0f172a" class="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0 shrink-0">
+              </label>
+              <label class="flex items-center justify-between gap-1 bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-800 cursor-pointer">
+                <span class="text-slate-300 font-semibold truncate">Arıza/Tespit:</span>
+                <input type="color" id="inputColorFault" value="#0f172a" class="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0 shrink-0">
+              </label>
+              <label class="flex items-center justify-between gap-1 bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-800 cursor-pointer">
+                <span class="text-slate-300 font-semibold truncate">Yapılan İşlem:</span>
+                <input type="color" id="inputColorWork" value="#0f172a" class="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0 shrink-0">
+              </label>
+              <label class="flex items-center justify-between gap-1 bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-800 cursor-pointer">
+                <span class="text-slate-300 font-semibold truncate">Nihai Durum:</span>
+                <input type="color" id="inputColorStatus" value="#0369a1" class="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0 shrink-0">
+              </label>
+              <label class="flex items-center justify-between gap-1 bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-800 cursor-pointer col-span-2 sm:col-span-1">
+                <span class="text-slate-300 font-semibold truncate">Özel Notlar:</span>
+                <input type="color" id="inputColorNotes" value="#78350f" class="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0 shrink-0">
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -1578,6 +1661,18 @@ a { color: inherit; text-decoration: inherit; }
         </div>
       </div>
       
+      <!-- Canlı Yazı Rengi Değiştirme Çubuğu (Fiş Önizleme Üzerinde) -->
+      <div class="flex items-center flex-wrap gap-1.5 bg-slate-950/90 border border-slate-800 px-2.5 py-1.5 rounded-xl">
+        <span class="text-[10px] font-bold text-slate-300 mr-0.5" id="lblReceiptColorTarget">🎨 Yazı Rengi (Tümü):</span>
+        <button type="button" data-live-color="#0f172a" class="receipt-live-color-btn w-5 h-5 rounded-full bg-slate-950 border-2 border-white/60 hover:scale-110 transition" title="Siyah / Koyu Lacivert"></button>
+        <button type="button" data-live-color="#1d4ed8" class="receipt-live-color-btn w-5 h-5 rounded-full bg-blue-700 border border-white/40 hover:scale-110 transition" title="Kalem Mavisi"></button>
+        <button type="button" data-live-color="#dc2626" class="receipt-live-color-btn w-5 h-5 rounded-full bg-red-600 border border-white/40 hover:scale-110 transition" title="Kırmızı"></button>
+        <button type="button" data-live-color="#047857" class="receipt-live-color-btn w-5 h-5 rounded-full bg-emerald-700 border border-white/40 hover:scale-110 transition" title="Yeşil"></button>
+        <button type="button" data-live-color="#b45309" class="receipt-live-color-btn w-5 h-5 rounded-full bg-amber-600 border border-white/40 hover:scale-110 transition" title="Turuncu / Kehribar"></button>
+        <button type="button" data-live-color="#6d28d9" class="receipt-live-color-btn w-5 h-5 rounded-full bg-purple-700 border border-white/40 hover:scale-110 transition" title="Mor"></button>
+        <input type="color" id="inputReceiptLiveColorPicker" value="#0f172a" class="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0" title="Özel Renk Seç">
+      </div>
+
       <div class="flex items-center flex-wrap gap-2 ml-auto">
         <button id="btnTriggerAirPrint" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 transition active:scale-95 shadow-lg" title="AirPrint ile Tek Sayfa A4 Yazdır">
           <span>🖨️</span> <span>Yazdır</span>
@@ -30217,9 +30312,9 @@ a { color: inherit; text-decoration: inherit; }
       name: "İNANIR KULE VİNÇ - KEMAL DENİZ İNANIR",
       shortName: "İNANIR KULE VİNÇ",
       slogan: "Kule Vinç Montaj, Demontaj, Saha Servisi & Elektronik Teşhis",
-      address: "Güneşli Mah. 1365. Sk. Altuntaş Apt. No: 18/2 Bağcılar / İstanbul",
-      phone: "",
-      gsm: "",
+      address: "Güneşli Mah. 1365. Sokak Altuntaş Apt. No:18 İç Kapı No:2 Bağcılar - İSTANBUL",
+      phone: "0532 599 99 24",
+      gsm: "0549 550 59 05",
       email: "servis@inanirkulevinc.com",
       website: "www.inanirkulevinc.com",
       taxOffice: "Güneşli V.D.",
@@ -34760,10 +34855,21 @@ let toastHideTimer = null;
         }
 
         let statusBadge = '<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">🟢 Faal / Çalışır</span>';
-        if (form.status === 'Sartli') {
+        if (form.status === 'KuruluDegil') {
+          statusBadge = '<span class="px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/30 text-[10px] font-bold">🔵 Makine Kurulu Değil</span>';
+        } else if (form.status === 'MontajAsamasinda') {
+          statusBadge = '<span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30 text-[10px] font-bold">🟣 Montaj Aşamasında</span>';
+        } else if (form.status === 'DemontajEdildi') {
+          statusBadge = '<span class="px-2 py-0.5 rounded bg-slate-500/10 text-slate-300 border border-slate-500/30 text-[10px] font-bold">⚪ Demontaj Edildi</span>';
+        } else if (form.status === 'Sartli') {
           statusBadge = '<span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-bold">🟡 Şartlı Çalışır</span>';
         } else if (form.status === 'Emniyetsiz') {
           statusBadge = '<span class="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/30 text-[10px] font-bold">🔴 Emniyetsiz / Kilitli</span>';
+        } else if (form.status === 'Ozel') {
+          statusBadge = `<span class="px-2 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/30 text-[10px] font-bold">✏️ ${form.customStatusText || 'Özel Durum'}</span>`;
+        }
+        if (form.customStatusText && form.status !== 'Ozel') {
+          statusBadge += ` <span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] font-bold">${form.customStatusText}</span>`;
         }
 
         const card = document.createElement('div');
@@ -34797,7 +34903,7 @@ let toastHideTimer = null;
               <strong class="text-white font-bold block text-xs">${form.craneBrand || ''} ${form.craneModel || ''}</strong>
               <span class="text-slate-300">${form.craneSerial ? 'Seri/Kule No: ' + form.craneSerial : ''}</span>
               <p class="text-slate-400 text-[10px] mt-0.5">
-                ${form.craneJib ? form.craneJib + 'm Bom' : ''} ${form.craneHeight ? '• ' + form.craneHeight + 'm Yükseklik' : ''}
+                ${formatBomHeightText(form)}
               </p>
             </div>
           </div>
@@ -34919,6 +35025,20 @@ let toastHideTimer = null;
         document.getElementById('chkTestEStop').checked = !!chk.eStopTest;
 
         document.getElementById('selectServiceStatus').value = existing.status || 'Faal';
+        if (document.getElementById('inputServiceCustomStatus')) {
+          document.getElementById('inputServiceCustomStatus').value = existing.customStatusText || '';
+        }
+        if (document.getElementById('selectCustomStatusMode')) {
+          document.getElementById('selectCustomStatusMode').value = existing.customStatusMode || 'append';
+        }
+        const tc = existing.textColors || {};
+        const globalCol = existing.textColor || '#0f172a';
+        if (document.getElementById('inputServiceGlobalTextColor')) document.getElementById('inputServiceGlobalTextColor').value = globalCol;
+        if (document.getElementById('inputColorInfo')) document.getElementById('inputColorInfo').value = tc.info || globalCol;
+        if (document.getElementById('inputColorFault')) document.getElementById('inputColorFault').value = tc.fault || globalCol;
+        if (document.getElementById('inputColorWork')) document.getElementById('inputColorWork').value = tc.work || globalCol;
+        if (document.getElementById('inputColorStatus')) document.getElementById('inputColorStatus').value = tc.status || '';
+        if (document.getElementById('inputColorNotes')) document.getElementById('inputColorNotes').value = tc.notes || '#78350f';
         document.getElementById('inputServiceTechnician').value = existing.technician || 'İnanır Kule Vinç Teknisyeni';
         document.getElementById('inputServiceReceiver').value = existing.receiver || '';
         document.getElementById('inputServiceNotes').value = existing.notes || '';
@@ -34975,6 +35095,18 @@ let toastHideTimer = null;
         document.getElementById('chkTestEStop').checked = true;
 
         document.getElementById('selectServiceStatus').value = 'Faal';
+        if (document.getElementById('inputServiceCustomStatus')) {
+          document.getElementById('inputServiceCustomStatus').value = '';
+        }
+        if (document.getElementById('selectCustomStatusMode')) {
+          document.getElementById('selectCustomStatusMode').value = 'append';
+        }
+        if (document.getElementById('inputServiceGlobalTextColor')) document.getElementById('inputServiceGlobalTextColor').value = '#0f172a';
+        if (document.getElementById('inputColorInfo')) document.getElementById('inputColorInfo').value = '#0f172a';
+        if (document.getElementById('inputColorFault')) document.getElementById('inputColorFault').value = '#0f172a';
+        if (document.getElementById('inputColorWork')) document.getElementById('inputColorWork').value = '#0f172a';
+        if (document.getElementById('inputColorStatus')) document.getElementById('inputColorStatus').value = '#065f46';
+        if (document.getElementById('inputColorNotes')) document.getElementById('inputColorNotes').value = '#78350f';
         document.getElementById('inputServiceTechnician').value = 'İnanır Kule Vinç Servis Ekibi';
         document.getElementById('inputServiceReceiver').value = '';
         document.getElementById('inputServiceNotes').value = '';
@@ -35017,7 +35149,7 @@ let toastHideTimer = null;
         craneHeight: document.getElementById('inputServiceCraneHeight').value.trim(),
         reportedFault: document.getElementById('inputServiceReportedFault').value.trim(),
         detectedFault: document.getElementById('inputServiceDetectedFault').value.trim(),
-        workDone: workDone || 'İşlemler tamamlandı.',
+        workDone: workDone,
         partsReplaced: document.getElementById('inputServicePartsReplaced').value.trim(),
         checklist: {
           brakeTest: document.getElementById('chkTestBrake').checked,
@@ -35028,6 +35160,17 @@ let toastHideTimer = null;
           eStopTest: document.getElementById('chkTestEStop').checked
         },
         status: document.getElementById('selectServiceStatus').value,
+        customStatusText: document.getElementById('inputServiceCustomStatus')?.value.trim() || '',
+        customStatusMode: document.getElementById('selectCustomStatusMode')?.value || 'append',
+        textColor: document.getElementById('inputServiceGlobalTextColor')?.value || '#0f172a',
+        textColors: {
+          info: document.getElementById('inputColorInfo')?.value || '#0f172a',
+          fault: document.getElementById('inputColorFault')?.value || '#0f172a',
+          work: document.getElementById('inputColorWork')?.value || '#0f172a',
+          status: document.getElementById('inputColorStatus')?.value || '',
+          notes: document.getElementById('inputColorNotes')?.value || '#78350f',
+          fields: (currentEditingServiceId && store.serviceForms.find(s => s.id === currentEditingServiceId)?.textColors?.fields) || {}
+        },
         technician: document.getElementById('inputServiceTechnician').value.trim() || 'İnanır Vinç',
         receiver: document.getElementById('inputServiceReceiver').value.trim(),
         notes: document.getElementById('inputServiceNotes').value.trim(),
@@ -35086,29 +35229,152 @@ let toastHideTimer = null;
       showToast(`${name} başarıyla silindi`);
     }
 
+    function formatBomHeightText(form) {
+      if (!form) return '';
+      const rawJib = String(form.craneJib || '').trim();
+      const rawHeight = String(form.craneHeight || '').trim();
+      let jibPart = '';
+      let heightPart = '';
+      if (rawJib) {
+        if (/^\d+([.,]\d+)?$/.test(rawJib)) jibPart = `${rawJib}m Bom`;
+        else if (/bom|kurulu|ayak|temel/i.test(rawJib)) jibPart = rawJib;
+        else jibPart = `${rawJib} Bom`;
+      }
+      if (rawHeight) {
+        if (/^\d+([.,]\d+)?$/.test(rawHeight)) heightPart = `${rawHeight}m Yükseklik`;
+        else if (/yük|yuk|irtifa|ayak|temel|kurulu/i.test(rawHeight)) heightPart = rawHeight;
+        else heightPart = `${rawHeight} Yükseklik`;
+      }
+      if (jibPart && heightPart) return `${jibPart} • ${heightPart}`;
+      return jibPart || heightPart || '';
+    }
+
+    function getReceiptStatusMeta(status, formObj = null) {
+      let base = {
+        text: 'TAM ÇALIŞIR / FAAL DURUMDA TESLİM EDİLDİ',
+        bg: '#ecfdf5',
+        border: '#10b981',
+        color: '#065f46'
+      };
+      if (status === 'KuruluDegil') {
+        base = {
+          text: 'MAKİNE KURULU DEĞİL (TEMEL / GÖMME AYAK / ÖN HAZIRLIK)',
+          bg: '#f0f9ff',
+          border: '#0284c7',
+          color: '#0369a1'
+        };
+      } else if (status === 'MontajAsamasinda') {
+        base = {
+          text: 'MONTAJ / KURULUM AŞAMASINDA (KURULUM DEVAM EDİYOR)',
+          bg: '#faf5ff',
+          border: '#9333ea',
+          color: '#6b21a8'
+        };
+      } else if (status === 'DemontajEdildi') {
+        base = {
+          text: 'VİNÇ DEMONTAJ EDİLDİ / SÖKÜM TAMAMLANDI',
+          bg: '#f8fafc',
+          border: '#64748b',
+          color: '#334155'
+        };
+      } else if (status === 'Sartli') {
+        base = {
+          text: 'ŞARTLI ÇALIŞIR (PARÇA / SERVİS BEKLENİYOR)',
+          bg: '#fffbeb',
+          border: '#f59e0b',
+          color: '#92400e'
+        };
+      } else if (status === 'Emniyetsiz') {
+        base = {
+          text: 'EMNİYETSİZ - KULLANIMA KAPATILDI / KİLİTLENDİ',
+          bg: '#fef2f2',
+          border: '#ef4444',
+          color: '#991b1b'
+        };
+      } else if (status === 'Ozel') {
+        base = {
+          text: 'ÖZEL DURUM BELİRTİLDİ',
+          bg: '#f0f9ff',
+          border: '#0284c7',
+          color: '#0369a1'
+        };
+      }
+
+      if (formObj) {
+        const customTxt = String(formObj.customStatusText || '').trim();
+        const mode = formObj.customStatusMode || 'append';
+        if (customTxt) {
+          if (status === 'Ozel' || mode === 'replace') {
+            base.text = customTxt;
+          } else {
+            base.text = `${base.text} — ${customTxt}`;
+          }
+        }
+        const customCol = formObj.textColors?.fields?.statusText || formObj.textColors?.status;
+        if (customCol) {
+          base.color = customCol;
+          base.border = customCol;
+        }
+      }
+      return base;
+    }
+
+    function getFieldTextColor(form, fieldName, fallbackColor = '#0f172a') {
+      if (!form) return fallbackColor;
+      const tc = form.textColors || {};
+      if (tc.fields && tc.fields[fieldName]) return tc.fields[fieldName];
+      if (['clientCompany', 'siteName', 'siteLocation', 'contactPerson', 'contactPhone', 'craneSerial', 'craneJib', 'craneHeight'].includes(fieldName)) {
+        return tc.info || form.textColor || fallbackColor;
+      }
+      if (['craneBrand', 'craneModel'].includes(fieldName)) {
+        return (tc.info && tc.info !== '#0f172a') ? tc.info : (form.textColor && form.textColor !== '#0f172a' ? form.textColor : fallbackColor);
+      }
+      if (['reportedFault', 'detectedFault'].includes(fieldName)) {
+        return tc.fault || form.textColor || fallbackColor;
+      }
+      if (['workDone', 'partsReplaced'].includes(fieldName)) {
+        return tc.work || form.textColor || fallbackColor;
+      }
+      if (fieldName === 'statusText') {
+        return tc.status || fallbackColor;
+      }
+      if (fieldName === 'notes') {
+        return tc.notes || form.textColor || fallbackColor;
+      }
+      if (['technician', 'receiver'].includes(fieldName)) {
+        return tc.info || form.textColor || fallbackColor;
+      }
+      return form.textColor || fallbackColor;
+    }
+
     // RESMİ YAZDIRMA ŞABLONU OLUŞTURUCU (FOTOĞRAFSIZ, NET VE TEK SAYFA A4 UYUMLU)
     function getReceiptHtmlMarkup(form, comp, isEditable = false) {
       if (!comp) comp = store.companyInfo || DEFAULT_COMPANY_INFO;
       if (!form) form = {};
 
       const chk = form.checklist || {};
-
-      let statusBadgeText = 'TAM ÇALIŞIR / FAAL DURUMDA TESLİM EDİLDİ';
-      let statusBg = '#ecfdf5';
-      let statusBorder = '#10b981';
-      let statusColor = '#065f46';
-
-      if (form.status === 'Sartli') {
-        statusBadgeText = 'ŞARTLI ÇALIŞIR (PARÇA / SERVİS BEKLENİYOR)';
-        statusBg = '#fffbeb';
-        statusBorder = '#f59e0b';
-        statusColor = '#92400e';
-      } else if (form.status === 'Emniyetsiz') {
-        statusBadgeText = 'EMNİYETSİZ - KULLANIMA KAPATILDI / KİLİTLENDİ';
-        statusBg = '#fef2f2';
-        statusBorder = '#ef4444';
-        statusColor = '#991b1b';
-      }
+      const statusMeta = getReceiptStatusMeta(form.status, form);
+      const statusBadgeText = statusMeta.text;
+      const statusBg = statusMeta.bg;
+      const statusBorder = statusMeta.border;
+      const statusColor = statusMeta.color;
+      const bomHeightDisplay = formatBomHeightText(form);
+      const cClient = getFieldTextColor(form, 'clientCompany', '#0f172a');
+      const cSite = getFieldTextColor(form, 'siteName', '#0f172a');
+      const cLoc = getFieldTextColor(form, 'siteLocation', '#334155');
+      const cContact = getFieldTextColor(form, 'contactPerson', '#0f172a');
+      const cPhone = getFieldTextColor(form, 'contactPhone', '#0f172a');
+      const cBrand = getFieldTextColor(form, 'craneBrand', '#b45309');
+      const cModel = getFieldTextColor(form, 'craneModel', '#b45309');
+      const cSerial = getFieldTextColor(form, 'craneSerial', '#0f172a');
+      const cJib = getFieldTextColor(form, 'craneJib', '#0f172a');
+      const cRep = getFieldTextColor(form, 'reportedFault', '#0f172a');
+      const cDet = getFieldTextColor(form, 'detectedFault', '#0f172a');
+      const cWork = getFieldTextColor(form, 'workDone', '#0f172a');
+      const cParts = getFieldTextColor(form, 'partsReplaced', '#0f172a');
+      const cNotes = getFieldTextColor(form, 'notes', '#78350f');
+      const cTech = getFieldTextColor(form, 'technician', '#0f172a');
+      const cRec = getFieldTextColor(form, 'receiver', '#0f172a');
 
       const editAttr = (field) => isEditable ? ` class="editable-field" contenteditable="true" data-field="${field}"` : '';
 
@@ -35153,10 +35419,10 @@ let toastHideTimer = null;
                 <span style="font-weight: 900; font-size: 9.5px; text-transform: uppercase; color: #0f172a;">🏢 ŞANTİYE & MÜŞTERİ BİLGİLERİ</span>
                 <span style="font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: #e2e8f0; color: #334155;">TALEP EDEN</span>
               </div>
-              <div style="display: flex; flex-direction: column; gap: 3px;">
-                <div><strong style="color: #475569;">Firma:</strong> <span style="font-weight: 700; color: #0f172a;"${editAttr('clientCompany')}>${form.clientCompany || '-'}</span></div>
-                <div><strong style="color: #475569;">Şantiye:</strong> <span${editAttr('siteName')}>${form.siteName || '-'}</span> <span style="color: #64748b; font-size: 9px;"${editAttr('siteLocation')}>${form.siteLocation ? '(' + form.siteLocation + ')' : ''}</span></div>
-                <div><strong style="color: #475569;">Yetkili:</strong> <span${editAttr('contactPerson')}>${form.contactPerson || '-'}</span> <span style="font-family: monospace;"${editAttr('contactPhone')}>${form.contactPhone ? '• ' + form.contactPhone : ''}</span></div>
+              <div style="display: flex; flex-direction: column; gap: 4px; word-break: break-word; overflow-wrap: anywhere;">
+                <div><strong style="color: #475569;">Firma:</strong> <span style="font-weight: 700; color: ${cClient};"${editAttr('clientCompany')}>${form.clientCompany || ''}</span></div>
+                <div><strong style="color: #475569;">Şantiye:</strong> <span style="font-weight: 600; color: ${cSite};"${editAttr('siteName')}>${form.siteName || ''}</span> <span style="color: ${cLoc}; font-weight: 600;"${editAttr('siteLocation')}>${form.siteLocation ? '(' + form.siteLocation + ')' : ''}</span></div>
+                <div><strong style="color: #475569;">Yetkili:</strong> <span style="color: ${cContact};"${editAttr('contactPerson')}>${form.contactPerson || ''}</span> <span style="font-family: monospace; color: ${cPhone};"${editAttr('contactPhone')}>${form.contactPhone ? '• ' + form.contactPhone : ''}</span></div>
               </div>
             </div>
 
@@ -35166,10 +35432,10 @@ let toastHideTimer = null;
                 <span style="font-weight: 900; font-size: 9.5px; text-transform: uppercase; color: #0f172a;">🏗️ KULE VİNÇ KÜNYESİ</span>
                 <span style="font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: #fef3c7; color: #92400e;">MAKİNE</span>
               </div>
-              <div style="display: flex; flex-direction: column; gap: 3px;">
-                <div><strong style="color: #475569;">Marka / Model:</strong> <span style="font-weight: 700; color: #b45309;"${editAttr('craneBrand')}>${form.craneBrand || '-'}</span> <span style="font-weight: 700; color: #b45309;"${editAttr('craneModel')}>${form.craneModel || ''}</span></div>
-                <div><strong style="color: #475569;">Seri / Kule No:</strong> <span style="font-family: monospace; font-weight: 700; color: #0f172a;"${editAttr('craneSerial')}>${form.craneSerial || '-'}</span></div>
-                <div><strong style="color: #475569;">Bom / Yükseklik:</strong> <span${editAttr('craneJib')}>${form.craneJib ? form.craneJib + 'm Bom' : '-'}</span> • <span${editAttr('craneHeight')}>${form.craneHeight ? form.craneHeight + 'm Yükseklik' : '-'}</span></div>
+              <div style="display: flex; flex-direction: column; gap: 4px; word-break: break-word; overflow-wrap: anywhere;">
+                <div><strong style="color: #475569;">Marka / Model:</strong> <span style="font-weight: 700; color: ${cBrand};"${editAttr('craneBrand')}>${form.craneBrand || ''}</span> <span style="font-weight: 700; color: ${cModel};"${editAttr('craneModel')}>${form.craneModel || ''}</span></div>
+                <div><strong style="color: #475569;">Seri / Kule No:</strong> <span style="font-family: monospace; font-weight: 700; color: ${cSerial};"${editAttr('craneSerial')}>${form.craneSerial || ''}</span></div>
+                <div><strong style="color: #475569;">Bom / Yükseklik:</strong> <span style="font-weight: 600; color: ${cJib};"${editAttr('craneJib')}>${bomHeightDisplay}</span></div>
               </div>
             </div>
           </div>
@@ -35182,11 +35448,11 @@ let toastHideTimer = null;
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
               <div>
                 <strong style="color: #475569; font-size: 9px; display: block;">Bildirilen Durum / Müşteri Talebi:</strong>
-                <p style="margin: 3px 0 0 0; color: #0f172a; background: #ffffff; padding: 5px 7px; border-radius: 4px; border: 1px solid #e2e8f0; font-size: 9.5px; min-height: 36px;"${editAttr('reportedFault')}>${form.reportedFault || 'Rutin kontrol ve arıza müdahalesi.'}</p>
+                <p style="margin: 3px 0 0 0; color: ${cRep}; background: #ffffff; padding: 5px 7px; border-radius: 4px; border: 1px solid #e2e8f0; font-size: 9.5px; min-height: 36px; white-space: pre-line;"${editAttr('reportedFault')}>${form.reportedFault || ''}</p>
               </div>
               <div>
                 <strong style="color: #b91c1c; font-size: 9px; display: block; font-weight: 800;">Tespit Edilen Arıza / Hata Kodu:</strong>
-                <p style="margin: 3px 0 0 0; color: #0f172a; background: #ffffff; padding: 5px 7px; border-radius: 4px; border: 1px solid #e2e8f0; font-size: 9.5px; min-height: 36px;"${editAttr('detectedFault')}>${form.detectedFault || 'Mekanik ve elektriksel ölçümler tamamlandı.'}</p>
+                <p style="margin: 3px 0 0 0; color: ${cDet}; background: #ffffff; padding: 5px 7px; border-radius: 4px; border: 1px solid #e2e8f0; font-size: 9.5px; min-height: 36px; white-space: pre-line;"${editAttr('detectedFault')}>${form.detectedFault || ''}</p>
               </div>
             </div>
           </div>
@@ -35198,11 +35464,11 @@ let toastHideTimer = null;
                 <span>🛠️</span> YAPILAN TEKNİK MÜDAHALE & UYGULANAN İŞLEMLER
               </span>
             </div>
-            <div style="font-size: 10px; color: #0f172a; white-space: pre-line; line-height: 1.45; padding: 6px 8px; background: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0; min-height: 55px;"${editAttr('workDone')}>${form.workDone || '-'}</div>
+            <div style="font-size: 10px; color: ${cWork}; white-space: pre-line; line-height: 1.45; padding: 6px 8px; background: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0; min-height: 55px;"${editAttr('workDone')}>${form.workDone || ''}</div>
             
             <div style="margin-top: 6px; padding-top: 5px; border-top: 1px dashed #cbd5e1; display: flex; align-items: flex-start; gap: 6px; font-size: 9.5px;">
               <strong style="color: #78350f; flex-shrink: 0;">Değiştirilen / Kullanılan Parçalar:</strong>
-              <span style="color: #0f172a; font-weight: 700; flex: 1;"${editAttr('partsReplaced')}>${form.partsReplaced || 'Parça değişimi yapılmadı.'}</span>
+              <span style="color: ${cParts}; font-weight: 700; flex: 1;"${editAttr('partsReplaced')}>${form.partsReplaced || ''}</span>
             </div>
           </div>
 
@@ -35226,12 +35492,12 @@ let toastHideTimer = null;
           </div>
 
           <!-- 6. VİNÇ NİHAİ DURUMU -->
-          <div style="padding: 6px 8px; border-radius: 5px; border: 1.5px solid ${statusBorder}; background: ${statusBg}; text-align: center; font-weight: 900; font-size: 10px; color: ${statusColor}; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;">
+          <div style="padding: 6px 8px; border-radius: 5px; border: 1.5px solid ${statusBorder}; background: ${statusBg}; text-align: center; font-weight: 900; font-size: 10px; color: ${statusColor}; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px; word-break: break-word;">
             VİNÇ NİHAİ TESLİM DURUMU: <span${editAttr('statusText')}>${statusBadgeText}</span>
           </div>
 
           ${form.notes ? `
-            <div style="padding: 5px 8px; border-radius: 5px; background: #fffbeb; border: 1px solid #fde68a; font-size: 9.5px; color: #78350f; margin-bottom: 8px;">
+            <div style="padding: 5px 8px; border-radius: 5px; background: #fffbeb; border: 1px solid #fde68a; font-size: 9.5px; color: ${cNotes}; margin-bottom: 8px; word-break: break-word;">
               <strong>Özel Notlar & Operatör Tavsiyeleri:</strong> <span${editAttr('notes')}>${form.notes}</span>
             </div>
           ` : ''}
@@ -35241,14 +35507,14 @@ let toastHideTimer = null;
             <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; text-align: center; background: #f8fafc;">
               <span style="font-size: 9.5px; font-weight: 900; color: #0f172a; display: block; text-transform: uppercase;">${comp.shortName || 'İNANIR KULE VİNÇ'}</span>
               <span style="font-size: 8px; color: #64748b; display: block;">Servisi Gerçekleştiren Yetkili Teknisyen</span>
-              <div style="font-size: 9.5px; font-weight: 700; color: #0f172a; margin: 6px 0 22px 0;"${editAttr('technician')}>${form.technician || comp.serviceManager || 'Servis Teknisyeni'}</div>
+              <div style="font-size: 9.5px; font-weight: 700; color: ${cTech}; margin: 6px 0 22px 0;"${editAttr('technician')}>${form.technician || comp.serviceManager || 'Servis Teknisyeni'}</div>
               <div style="font-size: 8px; color: #94a3b8; border-top: 1px solid #cbd5e1; padding-top: 3px;">İmza / Kaşe</div>
             </div>
 
             <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; text-align: center; background: #f8fafc;">
               <span style="font-size: 9.5px; font-weight: 900; color: #0f172a; display: block; text-transform: uppercase;">MÜŞTERİ / ŞANTİYE YÖNETİMİ</span>
               <span style="font-size: 8px; color: #64748b; display: block;">Teslim Alan Şantiye Yetkilisi</span>
-              <div style="font-size: 9.5px; font-weight: 700; color: #0f172a; margin: 6px 0 22px 0;"${editAttr('receiver')}>${form.receiver || form.contactPerson || 'Şantiye Yetkilisi'}</div>
+              <div style="font-size: 9.5px; font-weight: 700; color: ${cRec}; margin: 6px 0 22px 0;"${editAttr('receiver')}>${form.receiver || form.contactPerson || 'Şantiye Yetkilisi'}</div>
               <div style="font-size: 8px; color: #94a3b8; border-top: 1px solid #cbd5e1; padding-top: 3px;">İmza / Kaşe / Tarih</div>
             </div>
           </div>
@@ -35273,19 +35539,98 @@ let toastHideTimer = null;
         isolated.innerHTML = getReceiptHtmlMarkup(form, comp, false);
       }
 
+      let activeReceiptFieldForColor = null;
+      const lblColorTarget = document.getElementById('lblReceiptColorTarget');
+      if (lblColorTarget) lblColorTarget.innerText = '🎨 Yazı Rengi (Tüm Yazılar):';
+
+      const fieldLabelsTR = {
+        clientCompany: 'Firma Adı',
+        siteName: 'Şantiye Adı',
+        siteLocation: 'Konum/Şehir',
+        contactPerson: 'Yetkili',
+        contactPhone: 'Telefon',
+        craneBrand: 'Marka',
+        craneModel: 'Model',
+        craneSerial: 'Seri/Kule No',
+        craneJib: 'Bom/Yükseklik',
+        reportedFault: 'Bildirilen Arıza',
+        detectedFault: 'Tespit Edilen Arıza',
+        workDone: 'Yapılan İşlemler',
+        partsReplaced: 'Değişen Parçalar',
+        statusText: 'Nihai Durum',
+        notes: 'Özel Notlar',
+        technician: 'Teknisyen',
+        receiver: 'Teslim Alan'
+      };
+
       container.querySelectorAll('.editable-field').forEach(elem => {
+        elem.addEventListener('focus', () => {
+          const field = elem.getAttribute('data-field');
+          activeReceiptFieldForColor = field;
+          if (lblColorTarget && field) {
+            lblColorTarget.innerText = `🎨 Renk (${fieldLabelsTR[field] || field}):`;
+          }
+        });
         elem.addEventListener('blur', () => {
           const field = elem.getAttribute('data-field');
           const value = elem.innerText.trim();
-          if (field && form[field] !== undefined) {
+          if (field === 'statusText') {
+            form.customStatusText = value;
+            form.customStatusMode = 'replace';
+            saveStore();
+            renderServiceForms();
+            if (isolated) {
+              isolated.innerHTML = getReceiptHtmlMarkup(form, comp, false);
+            }
+          } else if (field && form[field] !== undefined) {
             form[field] = value;
             saveStore();
+            renderServiceForms();
             if (isolated) {
               isolated.innerHTML = getReceiptHtmlMarkup(form, comp, false);
             }
           }
         });
       });
+
+      function applyLiveColorToReceipt(chosenColor) {
+        if (!chosenColor) return;
+        if (!form.textColors) form.textColors = { fields: {} };
+        if (!form.textColors.fields) form.textColors.fields = {};
+        if (activeReceiptFieldForColor) {
+          form.textColors.fields[activeReceiptFieldForColor] = chosenColor;
+          if (activeReceiptFieldForColor === 'statusText') {
+            form.textColors.status = chosenColor;
+          }
+        } else {
+          form.textColor = chosenColor;
+          form.textColors.info = chosenColor;
+          form.textColors.fault = chosenColor;
+          form.textColors.work = chosenColor;
+          form.textColors.notes = chosenColor;
+          form.textColors.fields = {};
+        }
+        saveStore();
+        openPrintReceiptModal(form);
+        showToast(activeReceiptFieldForColor ? `🎨 "${fieldLabelsTR[activeReceiptFieldForColor] || activeReceiptFieldForColor}" yazı rengi güncellendi!` : '🎨 Fişteki tüm yazıların rengi güncellendi!');
+      }
+
+      document.querySelectorAll('.receipt-live-color-btn').forEach(btn => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          const c = btn.getAttribute('data-live-color');
+          const picker = document.getElementById('inputReceiptLiveColorPicker');
+          if (picker && c) picker.value = c;
+          applyLiveColorToReceipt(c);
+        };
+      });
+
+      const liveColorPicker = document.getElementById('inputReceiptLiveColorPicker');
+      if (liveColorPicker) {
+        liveColorPicker.oninput = (e) => {
+          applyLiveColorToReceipt(e.target.value);
+        };
+      }
 
       container.querySelectorAll('.chk-receipt-item').forEach(chkBox => {
         chkBox.addEventListener('change', () => {
@@ -35373,13 +35718,13 @@ let toastHideTimer = null;
       }
 
       function wrapTextLines(text, maxWidth, font) {
+        if (text === null || text === undefined || String(text).trim() === '') return [];
         ctx.font = font;
-        const paragraphs = String(text || '-').split(/\r?\n/);
+        const paragraphs = String(text).split(/\r?\n/);
         const lines = [];
         paragraphs.forEach(p => {
           const words = p.trim().split(/\s+/);
           if (words.length === 0 || (words.length === 1 && words[0] === '')) {
-            lines.push('');
             return;
           }
           let currentLine = words[0];
@@ -35452,10 +35797,29 @@ let toastHideTimer = null;
 
       curY += 34;
 
-      // 2. ŞANTİYE & VİNÇ KÜNYESİ (2 SÜTUN)
+      // 2. ŞANTİYE & VİNÇ KÜNYESİ (2 SÜTUN - UZUN ADRES VE BOM/YÜKSEKLİK ÇOK SATIRLI DESTEKLİ)
       const colGap = 20;
       const colW = (contentW - colGap) / 2;
-      const box2H = 148;
+      const rightX = marginX + colW + colGap;
+
+      const leftValW = colW - 110;
+      const rightValW = colW - 150;
+
+      const firmaLines = wrapTextLines(form.clientCompany || '', leftValW, `700 15px ${fontSans}`);
+      const siteFull = `${form.siteName || ''}${form.siteLocation ? ' (' + form.siteLocation + ')' : ''}`.trim();
+      const siteLines = wrapTextLines(siteFull, leftValW, `700 14.5px ${fontSans}`);
+      const contactFull = `${form.contactPerson || ''}${form.contactPhone ? ' • ' + form.contactPhone : ''}`.trim();
+      const contactLines = wrapTextLines(contactFull, leftValW, `700 14.5px ${fontSans}`);
+
+      const brandModelFull = `${form.craneBrand || ''} ${form.craneModel || ''}`.trim();
+      const brandModelLines = wrapTextLines(brandModelFull, rightValW, `900 15.5px ${fontSans}`);
+      const serialLines = wrapTextLines(form.craneSerial || '', rightValW, `700 15px ${fontMono}`);
+      const bomHeightFull = formatBomHeightText(form);
+      const bomHeightLines = wrapTextLines(bomHeightFull, rightValW, `700 14.5px ${fontSans}`);
+
+      const leftRowsH = (Math.max(1, firmaLines.length) + Math.max(1, siteLines.length) + Math.max(1, contactLines.length)) * 22 + 30;
+      const rightRowsH = (Math.max(1, brandModelLines.length) + Math.max(1, serialLines.length) + Math.max(1, bomHeightLines.length)) * 22 + 30;
+      const box2H = Math.max(154, leftRowsH + 46, rightRowsH + 46);
 
       // Sol Kutu: Şantiye & Müşteri
       drawRoundedRect(marginX, curY, colW, box2H, 10, '#f8fafc', '#cbd5e1', 1.8);
@@ -35471,26 +35835,46 @@ let toastHideTimer = null;
       ctx.lineTo(marginX + colW - 16, curY + 38);
       ctx.stroke();
 
+      let leftCurY = curY + 62;
       ctx.font = `700 15px ${fontSans}`;
       ctx.fillStyle = '#475569';
-      ctx.fillText('Firma:', marginX + 16, curY + 64);
-      ctx.fillStyle = '#0f172a';
-      ctx.fillText(String(form.clientCompany || '-').slice(0, 42), marginX + 95, curY + 64);
+      ctx.fillText('Firma:', marginX + 16, leftCurY);
+      ctx.fillStyle = getFieldTextColor(form, 'clientCompany', '#0f172a');
+      if (firmaLines.length > 0) {
+        firmaLines.slice(0, 3).forEach((ln, idx) => {
+          ctx.fillText(ln, marginX + 95, leftCurY + idx * 21);
+        });
+        leftCurY += Math.max(1, Math.min(3, firmaLines.length)) * 21 + 9;
+      } else {
+        leftCurY += 30;
+      }
 
       ctx.fillStyle = '#475569';
-      ctx.fillText('Şantiye:', marginX + 16, curY + 94);
-      ctx.fillStyle = '#0f172a';
-      const siteFull = `${form.siteName || '-'}${form.siteLocation ? ' (' + form.siteLocation + ')' : ''}`;
-      ctx.fillText(siteFull.slice(0, 42), marginX + 95, curY + 94);
+      ctx.font = `700 15px ${fontSans}`;
+      ctx.fillText('Şantiye:', marginX + 16, leftCurY);
+      ctx.fillStyle = getFieldTextColor(form, 'siteName', '#0f172a');
+      ctx.font = `700 14.5px ${fontSans}`;
+      if (siteLines.length > 0) {
+        siteLines.slice(0, 3).forEach((ln, idx) => {
+          ctx.fillText(ln, marginX + 95, leftCurY + idx * 21);
+        });
+        leftCurY += Math.max(1, Math.min(3, siteLines.length)) * 21 + 9;
+      } else {
+        leftCurY += 30;
+      }
 
       ctx.fillStyle = '#475569';
-      ctx.fillText('Yetkili:', marginX + 16, curY + 124);
-      ctx.fillStyle = '#0f172a';
-      const contactFull = `${form.contactPerson || '-'}${form.contactPhone ? ' • ' + form.contactPhone : ''}`;
-      ctx.fillText(contactFull.slice(0, 42), marginX + 95, curY + 124);
+      ctx.font = `700 15px ${fontSans}`;
+      ctx.fillText('Yetkili:', marginX + 16, leftCurY);
+      ctx.fillStyle = getFieldTextColor(form, 'contactPerson', '#0f172a');
+      ctx.font = `700 14.5px ${fontSans}`;
+      if (contactLines.length > 0) {
+        contactLines.slice(0, 2).forEach((ln, idx) => {
+          ctx.fillText(ln, marginX + 95, leftCurY + idx * 21);
+        });
+      }
 
       // Sağ Kutu: Kule Vinç Künyesi
-      const rightX = marginX + colW + colGap;
       drawRoundedRect(rightX, curY, colW, box2H, 10, '#f8fafc', '#cbd5e1', 1.8);
       ctx.fillStyle = '#0f172a';
       ctx.font = `900 16px ${fontSans}`;
@@ -35501,31 +35885,51 @@ let toastHideTimer = null;
       ctx.lineTo(rightX + colW - 16, curY + 38);
       ctx.stroke();
 
+      let rightCurY = curY + 62;
       ctx.font = `700 15px ${fontSans}`;
       ctx.fillStyle = '#475569';
-      ctx.fillText('Marka/Model:', rightX + 16, curY + 64);
-      ctx.fillStyle = '#b45309';
-      ctx.font = `900 16px ${fontSans}`;
-      ctx.fillText(`${form.craneBrand || ''} ${form.craneModel || '-'}`.trim(), rightX + 135, curY + 64);
+      ctx.fillText('Marka/Model:', rightX + 16, rightCurY);
+      ctx.fillStyle = getFieldTextColor(form, 'craneModel', '#b45309');
+      ctx.font = `900 15.5px ${fontSans}`;
+      if (brandModelLines.length > 0) {
+        brandModelLines.slice(0, 2).forEach((ln, idx) => {
+          ctx.fillText(ln, rightX + 135, rightCurY + idx * 21);
+        });
+        rightCurY += Math.max(1, Math.min(2, brandModelLines.length)) * 21 + 9;
+      } else {
+        rightCurY += 30;
+      }
 
       ctx.font = `700 15px ${fontSans}`;
       ctx.fillStyle = '#475569';
-      ctx.fillText('Seri/Kule No:', rightX + 16, curY + 94);
-      ctx.fillStyle = '#0f172a';
+      ctx.fillText('Seri/Kule No:', rightX + 16, rightCurY);
+      ctx.fillStyle = getFieldTextColor(form, 'craneSerial', '#0f172a');
       ctx.font = `700 15px ${fontMono}`;
-      ctx.fillText(String(form.craneSerial || '-'), rightX + 135, curY + 94);
+      if (serialLines.length > 0) {
+        serialLines.slice(0, 2).forEach((ln, idx) => {
+          ctx.fillText(ln, rightX + 135, rightCurY + idx * 21);
+        });
+        rightCurY += Math.max(1, Math.min(2, serialLines.length)) * 21 + 9;
+      } else {
+        rightCurY += 30;
+      }
 
       ctx.font = `700 15px ${fontSans}`;
       ctx.fillStyle = '#475569';
-      ctx.fillText('Bom / Yük.:', rightX + 16, curY + 124);
-      ctx.fillStyle = '#0f172a';
-      ctx.fillText(`${form.craneJib ? form.craneJib + 'm Bom' : '-'} • ${form.craneHeight ? form.craneHeight + 'm Yükseklik' : '-'}`, rightX + 135, curY + 124);
+      ctx.fillText('Bom / Yük.:', rightX + 16, rightCurY);
+      ctx.fillStyle = getFieldTextColor(form, 'craneJib', '#0f172a');
+      ctx.font = `700 14.5px ${fontSans}`;
+      if (bomHeightLines.length > 0) {
+        bomHeightLines.slice(0, 2).forEach((ln, idx) => {
+          ctx.fillText(ln, rightX + 135, rightCurY + idx * 21);
+        });
+      }
 
       curY += box2H + 18;
 
-      // 3. ARIZA ŞİKAYETİ & SAHA TESPİTİ
-      const repLines = wrapTextLines(form.reportedFault || 'Rutin kontrol ve arıza müdahalesi.', colW - 36, `600 15px ${fontSans}`);
-      const detLines = wrapTextLines(form.detectedFault || 'Mekanik ve elektriksel ölçümler tamamlandı.', colW - 36, `600 15px ${fontSans}`);
+      // 3. ARIZA ŞİKAYETİ & SAHA TESPİTİ (YAZILMADIYSA TAMAMEN BOŞ ÇIKAR)
+      const repLines = wrapTextLines(form.reportedFault || '', colW - 36, `600 15px ${fontSans}`);
+      const detLines = wrapTextLines(form.detectedFault || '', colW - 36, `600 15px ${fontSans}`);
       const maxFaultLines = Math.max(repLines.length, detLines.length, 2);
       const innerFaultH = Math.max(76, maxFaultLines * 22 + 20);
       const box3H = innerFaultH + 80;
@@ -35550,11 +35954,12 @@ let toastHideTimer = null;
       drawRoundedRect(marginX + 16, curY + 70, colW - 24, innerFaultH, 8, '#ffffff', '#e2e8f0', 1.2);
       drawRoundedRect(rightX + 8, curY + 70, colW - 24, innerFaultH, 8, '#ffffff', '#e2e8f0', 1.2);
 
-      ctx.fillStyle = '#0f172a';
       ctx.font = `600 15px ${fontSans}`;
+      ctx.fillStyle = getFieldTextColor(form, 'reportedFault', '#0f172a');
       repLines.slice(0, 6).forEach((ln, idx) => {
         ctx.fillText(ln, marginX + 26, curY + 94 + idx * 22);
       });
+      ctx.fillStyle = getFieldTextColor(form, 'detectedFault', '#0f172a');
       detLines.slice(0, 6).forEach((ln, idx) => {
         ctx.fillText(ln, rightX + 18, curY + 94 + idx * 22);
       });
@@ -35562,8 +35967,8 @@ let toastHideTimer = null;
       curY += box3H + 18;
 
       // 4. YAPILAN TEKNİK MÜDAHALE & DEĞİŞTİRİLEN PARÇALAR
-      const workLines = wrapTextLines(form.workDone || '-', contentW - 56, `600 15.5px ${fontSans}`);
-      const partsLines = wrapTextLines(form.partsReplaced || 'Parça değişimi yapılmadı.', contentW - 270, `700 15px ${fontSans}`);
+      const workLines = wrapTextLines(form.workDone || '', contentW - 56, `600 15.5px ${fontSans}`);
+      const partsLines = wrapTextLines(form.partsReplaced || '', contentW - 270, `700 15px ${fontSans}`);
       const workBoxInnerH = Math.max(115, Math.min(workLines.length, 9) * 23 + 24);
       const partsH = Math.max(36, partsLines.length * 22 + 12);
       const box4H = workBoxInnerH + partsH + 74;
@@ -35579,7 +35984,7 @@ let toastHideTimer = null;
       ctx.stroke();
 
       drawRoundedRect(marginX + 16, curY + 48, contentW - 32, workBoxInnerH, 8, '#f8fafc', '#e2e8f0', 1.2);
-      ctx.fillStyle = '#0f172a';
+      ctx.fillStyle = getFieldTextColor(form, 'workDone', '#0f172a');
       ctx.font = `600 15.5px ${fontSans}`;
       workLines.slice(0, 9).forEach((ln, idx) => {
         ctx.fillText(ln, marginX + 28, curY + 74 + idx * 23);
@@ -35590,7 +35995,7 @@ let toastHideTimer = null;
       ctx.font = `900 15px ${fontSans}`;
       ctx.fillText('Değiştirilen / Takılan Parçalar:', marginX + 16, partsY + 18);
 
-      ctx.fillStyle = '#0f172a';
+      ctx.fillStyle = getFieldTextColor(form, 'partsReplaced', '#0f172a');
       ctx.font = `700 15px ${fontSans}`;
       partsLines.slice(0, 3).forEach((ln, idx) => {
         ctx.fillText(ln, marginX + 255, partsY + 18 + idx * 22);
@@ -35641,39 +36046,32 @@ let toastHideTimer = null;
 
       curY += box5H + 18;
 
-      // 6. VİNÇ NİHAİ TESLİM DURUMU
-      let statusBadgeText = 'TAM ÇALIŞIR / FAAL DURUMDA TESLİM EDİLDİ';
-      let statusBg = '#ecfdf5';
-      let statusBorder = '#10b981';
-      let statusColor = '#065f46';
+      // 6. VİNÇ NİHAİ TESLİM DURUMU (ÖZEL NOT VE ÇOK SATIRLI DESTEKLİ)
+      const statusMeta = getReceiptStatusMeta(form.status, form);
+      const statusBadgeText = statusMeta.text;
+      const statusBg = statusMeta.bg;
+      const statusBorder = statusMeta.border;
+      const statusColor = statusMeta.color;
 
-      if (form.status === 'Sartli') {
-        statusBadgeText = 'ŞARTLI ÇALIŞIR (PARÇA / SERVİS BEKLENİYOR)';
-        statusBg = '#fffbeb';
-        statusBorder = '#f59e0b';
-        statusColor = '#92400e';
-      } else if (form.status === 'Emniyetsiz') {
-        statusBadgeText = 'EMNİYETSİZ - KULLANIMA KAPATILDI / KİLİTLENDİ';
-        statusBg = '#fef2f2';
-        statusBorder = '#ef4444';
-        statusColor = '#991b1b';
-      }
-
-      drawRoundedRect(marginX, curY, contentW, 46, 8, statusBg, statusBorder, 2);
+      const statusLines = wrapTextLines(`VİNÇ NİHAİ TESLİM DURUMU: ${statusBadgeText}`, contentW - 36, `900 16px ${fontSans}`);
+      const statusBoxH = Math.max(46, statusLines.length * 22 + 22);
+      drawRoundedRect(marginX, curY, contentW, statusBoxH, 8, statusBg, statusBorder, 2);
       ctx.fillStyle = statusColor;
-      ctx.font = `900 17px ${fontSans}`;
+      ctx.font = `900 16px ${fontSans}`;
       ctx.textAlign = 'center';
-      ctx.fillText(`VİNÇ NİHAİ TESLİM DURUMU: ${statusBadgeText}`, marginX + contentW / 2, curY + 29);
+      statusLines.slice(0, 3).forEach((ln, idx) => {
+        ctx.fillText(ln, marginX + contentW / 2, curY + 28 + idx * 22);
+      });
       ctx.textAlign = 'left';
 
-      curY += 62;
+      curY += statusBoxH + 16;
 
       // 7. ÖZEL NOTLAR
       if (form.notes) {
         const noteLines = wrapTextLines(`Özel Notlar: ${form.notes}`, contentW - 36, `600 14.5px ${fontSans}`);
         const noteH = Math.max(44, noteLines.length * 21 + 18);
         drawRoundedRect(marginX, curY, contentW, noteH, 8, '#fffbeb', '#fcd34d', 1.5);
-        ctx.fillStyle = '#78350f';
+        ctx.fillStyle = getFieldTextColor(form, 'notes', '#78350f');
         ctx.font = `700 14.5px ${fontSans}`;
         noteLines.slice(0, 3).forEach((ln, idx) => {
           ctx.fillText(ln, marginX + 16, curY + 26 + idx * 21);
@@ -35698,9 +36096,10 @@ let toastHideTimer = null;
       ctx.fillText('Servisi Gerçekleştiren Yetkili Teknisyen', marginX + colW / 2, curY + 48);
       ctx.fillText('Teslim Alan Şantiye Yetkilisi', rightX + colW / 2, curY + 48);
 
-      ctx.fillStyle = '#0f172a';
       ctx.font = `800 16px ${fontSans}`;
+      ctx.fillStyle = getFieldTextColor(form, 'technician', '#0f172a');
       ctx.fillText(form.technician || comp.serviceManager || 'Servis Teknisyeni', marginX + colW / 2, curY + 76);
+      ctx.fillStyle = getFieldTextColor(form, 'receiver', '#0f172a');
       ctx.fillText(form.receiver || form.contactPerson || 'Şantiye Yetkilisi', rightX + colW / 2, curY + 76);
 
       ctx.strokeStyle = '#cbd5e1';
@@ -36578,6 +36977,38 @@ let toastHideTimer = null;
       document.getElementById('btnCloseServiceFormModal')?.addEventListener('click', () => document.getElementById('modalServiceForm').classList.add('hidden'));
       document.getElementById('btnCancelServiceForm')?.addEventListener('click', () => document.getElementById('modalServiceForm').classList.add('hidden'));
       document.getElementById('btnSaveServiceForm')?.addEventListener('click', saveServiceFormFromModal);
+
+      function applyGlobalModalColorChoice(colorVal) {
+        if (!colorVal) return;
+        const gPicker = document.getElementById('inputServiceGlobalTextColor');
+        if (gPicker) gPicker.value = colorVal;
+        ['inputColorInfo', 'inputColorFault', 'inputColorWork', 'inputColorNotes'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.value = colorVal;
+        });
+      }
+
+      document.querySelectorAll('.service-color-preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const c = btn.getAttribute('data-color');
+          applyGlobalModalColorChoice(c);
+          showToast('🎨 Fiş yazı rengi seçildi');
+        });
+      });
+
+      document.getElementById('inputServiceGlobalTextColor')?.addEventListener('input', (e) => {
+        applyGlobalModalColorChoice(e.target.value);
+      });
+
+      document.getElementById('selectServiceStatus')?.addEventListener('change', (e) => {
+        const val = e.target.value;
+        const meta = getReceiptStatusMeta(val);
+        const stColorInput = document.getElementById('inputColorStatus');
+        if (stColorInput && meta.color) stColorInput.value = meta.color;
+        if (val === 'Ozel') {
+          document.getElementById('inputServiceCustomStatus')?.focus();
+        }
+      });
 
       // Fiş & İndirme Modalı Butonları
       document.getElementById('btnClosePrintReceiptModal')?.addEventListener('click', () => document.getElementById('modalPrintServiceReceipt').classList.add('hidden'));
